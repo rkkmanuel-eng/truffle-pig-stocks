@@ -13,22 +13,8 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
-interface FMPEtfProfile {
-  symbol: string;
-  companyName: string;
-  price: number;
-  mktCap: number;
-  volAvg: number;
-}
-
-interface FMPEtfHolder {
-  symbol: string;
-  totalAssets: number;
-  expenseRatio: number;
-}
-
-interface FMPEtfPerformance {
-  ytd: number;
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 export async function POST() {
@@ -38,62 +24,46 @@ export async function POST() {
 
   const metaMap = new Map(ETF_META.map((e) => [e.symbol, e]));
   const results: string[] = [];
-  const batchSize = 5;
 
-  for (let i = 0; i < ETF_SYMBOLS.length; i += batchSize) {
-    const batch = ETF_SYMBOLS.slice(i, i + batchSize);
-
+  for (let i = 0; i < ETF_SYMBOLS.length; i++) {
+    const symbol = ETF_SYMBOLS[i];
     try {
-      const profiles = await fetchJson<FMPEtfProfile[]>(
-        `${BASE_URL}/profile?symbol=${batch.join(",")}`
+      const profiles = await fetchJson<any[]>(
+        `${BASE_URL}/profile?symbol=${symbol}`
       );
+      const profile = profiles[0];
+      if (!profile) continue;
 
-      for (const profile of profiles) {
-        try {
-          let totalAssets: number | null = null;
-          let expenseRatio: number | null = null;
-          let ytdReturn: number | null = null;
+      let ytdReturn: number | null = null;
 
-          try {
-            const holders = await fetchJson<FMPEtfHolder[]>(
-              `${BASE_URL}/etf-holder?symbol=${profile.symbol}`
-            );
-            if (holders[0]) {
-              totalAssets = holders[0].totalAssets ?? null;
-              expenseRatio = holders[0].expenseRatio ?? null;
-            }
-          } catch {}
-
-          try {
-            const perf = await fetchJson<FMPEtfPerformance[]>(
-              `${BASE_URL}/stock-price-change?symbol=${profile.symbol}`
-            );
-            if (perf[0]) {
-              ytdReturn = perf[0].ytd ?? null;
-            }
-          } catch {}
-
-          const meta = metaMap.get(profile.symbol);
-
-          upsertEtf({
-            symbol: profile.symbol,
-            name: profile.companyName || meta?.name || profile.symbol,
-            category: meta?.category || "Other",
-            price: profile.price ?? null,
-            aum: totalAssets ?? profile.mktCap ?? null,
-            expense_ratio: expenseRatio,
-            ytd_return: ytdReturn,
-            avg_volume: profile.volAvg ?? null,
-          });
-
-          results.push(profile.symbol);
-        } catch (err) {
-          console.error(`Failed to fetch ETF data for ${profile.symbol}:`, err);
+      try {
+        const perf = await fetchJson<any[]>(
+          `${BASE_URL}/stock-price-change?symbol=${symbol}`
+        );
+        if (perf[0]) {
+          ytdReturn = perf[0].ytd ?? null;
         }
-      }
+      } catch {}
+
+      const meta = metaMap.get(profile.symbol);
+
+      upsertEtf({
+        symbol: profile.symbol,
+        name: profile.companyName || meta?.name || profile.symbol,
+        category: meta?.category || "Other",
+        price: profile.price ?? null,
+        aum: profile.marketCap ?? null,
+        expense_ratio: null,
+        ytd_return: ytdReturn,
+        avg_volume: profile.averageVolume ?? null,
+      });
+
+      results.push(profile.symbol);
     } catch (err) {
-      console.error(`Failed to fetch ETF profiles for batch:`, batch, err);
+      console.error(`Failed to fetch ETF data for ${symbol}:`, err);
     }
+
+    if (i + 1 < ETF_SYMBOLS.length) await sleep(600);
   }
 
   return NextResponse.json({ updated: results.length, symbols: results });

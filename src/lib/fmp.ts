@@ -7,26 +7,38 @@ export interface FMPProfile {
   sector: string;
   price: number;
   industry: string;
-  mktCap: number;
+  marketCap: number;
   beta: number;
-  volAvg: number;
+  averageVolume: number;
   range: string;
-  exchangeShortName: string;
-  lastDiv: number;
+  exchange: string;
+  lastDividend: number;
+  isEtf: boolean;
+  isFund: boolean;
+  isAdr: boolean;
+  isActivelyTrading: boolean;
 }
 
 export interface FMPRatios {
-  peRatioTTM: number;
+  priceToEarningsRatioTTM: number;
   priceToBookRatioTTM: number;
-  debtEquityRatioTTM: number;
+  debtToEquityRatioTTM: number;
   currentRatioTTM: number;
   dividendYieldTTM: number;
-  payoutRatioTTM: number;
+  dividendPayoutRatioTTM: number;
+  priceToEarningsGrowthRatioTTM: number;
+  netIncomePerShareTTM: number;
 }
 
-export interface FMPTechnical {
-  close: number;
-  sma: number;
+export interface FMPQuote {
+  symbol: string;
+  price: number;
+  marketCap: number;
+  priceAvg50: number;
+  priceAvg200: number;
+  yearHigh: number;
+  yearLow: number;
+  volume: number;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -38,10 +50,14 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
-export async function getProfiles(symbols: string[]): Promise<FMPProfile[]> {
-  if (symbols.length === 0) return [];
-  const batch = symbols.join(",");
-  return fetchJson<FMPProfile[]>(`${BASE_URL}/profile?symbol=${batch}`);
+export async function getProfile(symbol: string): Promise<FMPProfile | null> {
+  const data = await fetchJson<FMPProfile[]>(`${BASE_URL}/profile?symbol=${symbol}`);
+  return data[0] ?? null;
+}
+
+export async function getQuote(symbol: string): Promise<FMPQuote | null> {
+  const data = await fetchJson<FMPQuote[]>(`${BASE_URL}/quote?symbol=${symbol}`);
+  return data[0] ?? null;
 }
 
 export async function getRatiosTTM(symbol: string): Promise<FMPRatios | null> {
@@ -49,29 +65,10 @@ export async function getRatiosTTM(symbol: string): Promise<FMPRatios | null> {
   return data[0] ?? null;
 }
 
-export interface FMPKeyMetrics {
-  peRatioTTM: number;
-  epsTTM: number;
-}
-
-export async function getKeyMetricsTTM(symbol: string): Promise<FMPKeyMetrics | null> {
-  const data = await fetchJson<FMPKeyMetrics[]>(`${BASE_URL}/key-metrics-ttm?symbol=${symbol}`);
-  return data[0] ?? null;
-}
-
 export async function getDCF(symbol: string): Promise<number | null> {
   try {
     const data = await fetchJson<{ dcf: number }[]>(`${BASE_URL}/discounted-cash-flow?symbol=${symbol}`);
     return data[0]?.dcf ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export async function getPEGRatio(symbol: string): Promise<number | null> {
-  try {
-    const data = await fetchJson<{ pegRatio: number }[]>(`${BASE_URL}/key-metrics-ttm?symbol=${symbol}`);
-    return (data[0] as Record<string, number>)?.pegRatioTTM ?? null;
   } catch {
     return null;
   }
@@ -109,7 +106,6 @@ export function calculateDividendStreak(history: FMPDividendEntry[]): number {
   if (years.length < 2) return 0;
 
   let streak = 0;
-  const startYear = years[0] === currentYear ? years[0] : years[0];
 
   for (let i = 0; i < years.length - 1; i++) {
     const thisYear = years[i];
@@ -120,7 +116,6 @@ export function calculateDividendStreak(history: FMPDividendEntry[]): number {
     const thisTotal = yearlyTotals.get(thisYear)!;
     const prevTotal = yearlyTotals.get(prevYear)!;
 
-    // Current year may be partial — skip the comparison but don't break
     if (thisYear === currentYear && i === 0) {
       continue;
     }
@@ -135,11 +130,35 @@ export function calculateDividendStreak(history: FMPDividendEntry[]): number {
   return streak;
 }
 
-export async function getSMA(symbol: string, period: number): Promise<number | null> {
-  const data = await fetchJson<FMPTechnical[]>(
-    `${BASE_URL}/technical_indicator/daily?symbol=${symbol}&period=${period}&type=sma`
-  );
-  return data[0]?.sma ?? null;
+export async function searchSymbols(query: string, exchange: string): Promise<{ symbol: string; name: string }[]> {
+  try {
+    const data = await fetchJson<{ symbol: string; name: string }[]>(
+      `${BASE_URL}/search-symbol?query=${query}&exchange=${exchange}&limit=500`
+    );
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function discoverUSStocks(): Promise<string[]> {
+  const allSymbols = new Set<string>();
+  const exchanges = ["NYSE", "NASDAQ", "AMEX"];
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+  for (const exchange of exchanges) {
+    for (const letter of letters) {
+      const results = await searchSymbols(letter, exchange);
+      for (const r of results) {
+        if (!r.symbol.includes(".") && !r.symbol.includes("-") && !r.symbol.startsWith("^")) {
+          allSymbols.add(r.symbol);
+        }
+      }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  }
+
+  return [...allSymbols].sort();
 }
 
 export const DOW_SYMBOLS = [
@@ -157,22 +176,6 @@ export const SP500_SAMPLE = [
   "USB", "SO", "DUK", "EMR", "CL", "APD", "ITW", "MMC", "GD", "FDX",
 ];
 
-export async function getSP500Constituents(): Promise<string[]> {
-  const data = await fetchJson<{ symbol: string }[]>(`${BASE_URL}/sp500_constituent`);
-  return data.map((d) => d.symbol);
-}
-
-export async function getNasdaq100Constituents(): Promise<string[]> {
-  const data = await fetchJson<{ symbol: string }[]>(`${BASE_URL}/nasdaq_constituent`);
-  return data.map((d) => d.symbol);
-}
-
 export async function getAllTrackedSymbols(): Promise<string[]> {
-  const [sp500, nasdaq] = await Promise.all([
-    getSP500Constituents().catch(() => [] as string[]),
-    getNasdaq100Constituents().catch(() => [] as string[]),
-  ]);
-  const unique = [...new Set([...sp500, ...nasdaq])];
-  if (unique.length > 0) return unique;
   return SP500_SAMPLE;
 }

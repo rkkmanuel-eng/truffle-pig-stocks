@@ -4,6 +4,7 @@ import path from "path";
 const API_KEY = process.env.FMP_API_KEY || "";
 const BASE_URL = "https://financialmodelingprep.com/stable";
 const DB_DIR = process.env.DB_DIR || process.cwd();
+const MIN_MARKET_CAP = 300_000_000;
 
 const db = new Database(path.join(DB_DIR, "data.db"));
 db.pragma("journal_mode = WAL");
@@ -133,31 +134,6 @@ const DOW_SYMBOLS = [
   "MSFT", "NKE", "PG", "SHW", "TRV", "UNH", "V", "VZ", "WBA", "WMT",
 ];
 
-const FALLBACK_SYMBOLS = [
-  ...DOW_SYMBOLS,
-  "GOOGL", "AMZN", "META", "TSLA", "NVDA", "BRK-B", "LLY", "AVGO", "XOM",
-  "PEP", "COST", "ADBE", "NFLX", "AMD", "QCOM", "INTC", "CMCSA", "TXN",
-  "PM", "ABT", "DHR", "NEE", "LIN", "BMY", "ORCL", "ACN", "MDT", "COP",
-  "LOW", "T", "SCHW", "MS", "BLK", "GILD", "AMAT", "ADP", "PFE", "C",
-  "USB", "SO", "DUK", "EMR", "CL", "APD", "ITW", "MMC", "GD", "FDX",
-];
-
-async function getTrackedSymbols(): Promise<string[]> {
-  try {
-    const [sp500, nasdaq] = await Promise.all([
-      fetchJson<{ symbol: string }[]>(`${BASE_URL}/sp500_constituent`).catch(() => []),
-      fetchJson<{ symbol: string }[]>(`${BASE_URL}/nasdaq_constituent`).catch(() => []),
-    ]);
-    const unique = [...new Set([
-      ...sp500.map((d) => d.symbol),
-      ...nasdaq.map((d) => d.symbol),
-    ])];
-    if (unique.length > 0) return unique;
-  } catch {}
-  console.log("  Could not fetch index constituents, using fallback list.");
-  return FALLBACK_SYMBOLS;
-}
-
 const ETF_SYMBOLS = [
   "SPY", "IVV", "VOO", "VTI", "QQQ", "VEA", "VTV", "BND", "AGG", "IEFA",
   "VUG", "IWF", "VIG", "IEMG", "VWO", "IWM", "GLD", "VGT", "VXUS", "VO",
@@ -196,75 +172,123 @@ const upsertStreak = db.prepare(`
   ON CONFLICT(symbol) DO UPDATE SET streak_years=excluded.streak_years, updated_at=datetime('now')
 `);
 
-// --- Fetch real stock data ---
+// --- Discover US stocks dynamically ---
 
-async function seedStocksFromFMP() {
-  const symbols = await getTrackedSymbols();
-  console.log(`Fetching real data for ${symbols.length} stocks from FMP...`);
+async function discoverStocks(): Promise<string[]> {
+  console.log("Discovering US stocks via search-symbol...");
+  const allSymbols = new Set<string>();
+  const exchanges = ["NYSE", "NASDAQ", "AMEX"];
+  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+  for (const exchange of exchanges) {
+    for (const letter of letters) {
+      try {
+        const data = await fetchJson<{ symbol: string; name: string }[]>(
+          `${BASE_URL}/search-symbol?query=${letter}&exchange=${exchange}&limit=500`
+        );
+        if (Array.isArray(data)) {
+          for (const d of data) {
+            if (!d.symbol.includes(".") && !d.symbol.includes("-") && !d.symbol.startsWith("^")) {
+              allSymbols.add(d.symbol);
+            }
+          }
+        }
+      } catch {}
+      await sleep(150);
+    }
+    console.log(`  ${exchange}: ${allSymbols.size} total symbols`);
+  }
+
+  console.log(`  Discovered ${allSymbols.size} candidate symbols. Filtering by market cap...`);
+  return [...allSymbols].sort();
+}
+
+async function filterByMarketCap(symbols: string[]): Promise<string[]> {
+  const qualified: string[] = [];
+  let checked = 0;
+
+  for (const symbol of symbols) {
+    try {
+      const data = await fetchJson<any[]>(`${BASE_URL}/quote?symbol=${symbol}`);
+      const q = data[0];
+      if (q && q.marketCap >= MIN_MARKET_CAP) {
+        qualified.push(symbol);
+      }
+    } catch {}
+
+    checked++;
+    if (checked % 50 === 0) {
+      console.log(`  Checked ${checked}/${symbols.length}, qualified: ${qualified.length}`);
+    }
+    if (checked % 3 === 0) await sleep(600);
+  }
+
+  console.log(`  Qualified ${qualified.length} stocks with market cap >= $${(MIN_MARKET_CAP / 1e6).toFixed(0)}M`);
+  return qualified;
+}
+
+// --- Fetch stock data ---
+
+async function seedStockData(symbols: string[]) {
+  console.log(`Fetching detailed data for ${symbols.length} stocks...`);
   let count = 0;
-  const batchSize = 5;
 
-  for (let i = 0; i < symbols.length; i += batchSize) {
-    const batch = symbols.slice(i, i + batchSize);
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
 
     try {
-      const profiles = await fetchJson<any[]>(`${BASE_URL}/profile?symbol=${batch.join(",")}`);
+      const [profileData, quoteData, ratiosData, dcfData] = await Promise.all([
+        fetchJson<any[]>(`${BASE_URL}/profile?symbol=${symbol}`).catch(() => []),
+        fetchJson<any[]>(`${BASE_URL}/quote?symbol=${symbol}`).catch(() => []),
+        fetchJson<any[]>(`${BASE_URL}/ratios-ttm?symbol=${symbol}`).catch(() => []),
+        fetchJson<any[]>(`${BASE_URL}/discounted-cash-flow?symbol=${symbol}`).catch(() => []),
+      ]);
 
-      for (const p of profiles) {
-        try {
-          const [ratiosArr, keyMetricsArr, sma50Arr, sma200Arr, dcfArr] = await Promise.all([
-            fetchJson<any[]>(`${BASE_URL}/ratios-ttm?symbol=${p.symbol}`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/key-metrics-ttm?symbol=${p.symbol}`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/technical_indicator/daily?symbol=${p.symbol}&period=50&type=sma`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/technical_indicator/daily?symbol=${p.symbol}&period=200&type=sma`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/discounted-cash-flow?symbol=${p.symbol}`).catch(() => []),
-          ]);
+      const p = profileData[0] || {};
+      const q = quoteData[0] || {};
+      const r = ratiosData[0] || {};
 
-          const ratios = ratiosArr[0] || {};
-          const keyMetrics = keyMetricsArr[0] || {};
-          const rangeParts = p.range?.split("-").map(Number);
-
-          upsertStock.run(
-            p.symbol,
-            p.companyName,
-            p.sector,
-            p.price,
-            ratios.peRatioTTM ?? null,
-            ratios.priceToBookRatioTTM ?? null,
-            ratios.debtEquityRatioTTM ?? null,
-            ratios.currentRatioTTM ?? null,
-            ratios.dividendYieldTTM ?? null,
-            ratios.payoutRatioTTM ?? null,
-            sma50Arr[0]?.sma ?? null,
-            sma200Arr[0]?.sma ?? null,
-            dcfArr[0]?.dcf ?? null,
-            (keyMetrics as any).pegRatioTTM ?? null,
-            p.mktCap ?? null,
-            p.beta ?? null,
-            p.volAvg ?? null,
-            (keyMetrics as any).epsTTM ?? null,
-            rangeParts?.[1] || null,
-            rangeParts?.[0] || null,
-            p.industry ?? null,
-            p.exchangeShortName ?? null,
-            DOW_SYMBOLS.includes(p.symbol) ? 1 : 0,
-          );
-
-          count++;
-        } catch (err) {
-          console.error(`  Failed: ${p.symbol}`, (err as Error).message);
-        }
+      if (!p.companyName && !q.price) {
+        continue;
       }
+
+      upsertStock.run(
+        symbol,
+        p.companyName || symbol,
+        p.sector || null,
+        q.price ?? p.price ?? null,
+        r.priceToEarningsRatioTTM ?? null,
+        r.priceToBookRatioTTM ?? null,
+        r.debtToEquityRatioTTM ?? null,
+        r.currentRatioTTM ?? null,
+        r.dividendYieldTTM ?? null,
+        r.dividendPayoutRatioTTM ?? null,
+        q.priceAvg50 ?? null,
+        q.priceAvg200 ?? null,
+        dcfData[0]?.dcf ?? null,
+        r.priceToEarningsGrowthRatioTTM ?? null,
+        q.marketCap ?? p.marketCap ?? null,
+        p.beta ?? null,
+        p.averageVolume ?? null,
+        r.netIncomePerShareTTM ?? null,
+        q.yearHigh ?? null,
+        q.yearLow ?? null,
+        p.industry ?? null,
+        p.exchange ?? null,
+        DOW_SYMBOLS.includes(symbol) ? 1 : 0,
+      );
+
+      count++;
     } catch (err) {
-      console.error(`  Batch failed: ${batch.join(",")}`, (err as Error).message);
+      console.error(`  Failed: ${symbol}`, (err as Error).message);
     }
 
-    if (i + batchSize < symbols.length) {
+    if ((i + 1) % 3 === 0 && i + 1 < symbols.length) {
       await sleep(4000);
     }
 
-    if ((i / batchSize) % 10 === 9) {
-      console.log(`  Progress: ${Math.min(i + batchSize, symbols.length)}/${symbols.length} stocks...`);
+    if ((i + 1) % 50 === 0) {
+      console.log(`  Progress: ${i + 1}/${symbols.length} (${count} seeded)`);
     }
   }
 
@@ -274,7 +298,7 @@ async function seedStocksFromFMP() {
 // --- Fetch real ETF data ---
 
 async function seedETFsFromFMP() {
-  console.log(`Fetching real data for ${ETF_SYMBOLS.length} ETFs from FMP...`);
+  console.log(`Fetching data for ${ETF_SYMBOLS.length} ETFs...`);
 
   const ETF_CATEGORIES: Record<string, string> = {
     SPY: "Large Cap Blend", IVV: "Large Cap Blend", VOO: "Large Cap Blend",
@@ -288,29 +312,29 @@ async function seedETFsFromFMP() {
   };
 
   let count = 0;
-  const batchSize = 5;
 
-  for (let i = 0; i < ETF_SYMBOLS.length; i += batchSize) {
-    const batch = ETF_SYMBOLS.slice(i, i + batchSize);
+  for (let i = 0; i < ETF_SYMBOLS.length; i++) {
+    const symbol = ETF_SYMBOLS[i];
     try {
-      const profiles = await fetchJson<any[]>(`${BASE_URL}/profile?symbol=${batch.join(",")}`);
-      for (const p of profiles) {
+      const data = await fetchJson<any[]>(`${BASE_URL}/profile?symbol=${symbol}`);
+      const p = data[0];
+      if (p) {
         upsertEtf.run(
           p.symbol,
           p.companyName || p.symbol,
           ETF_CATEGORIES[p.symbol] || p.sector || "Other",
           p.price,
-          p.mktCap || null,
-          null, // expense_ratio not in profile endpoint
-          null, // ytd_return not in profile endpoint
-          p.volAvg || null,
+          p.marketCap || null,
+          null,
+          null,
+          p.averageVolume || null,
         );
         count++;
       }
     } catch (err) {
-      console.error(`  ETF batch failed: ${batch.join(",")}`, (err as Error).message);
+      console.error(`  ETF failed: ${symbol}`, (err as Error).message);
     }
-    if (i + batchSize < ETF_SYMBOLS.length) await sleep(200);
+    if (i + 1 < ETF_SYMBOLS.length) await sleep(600);
   }
 
   console.log(`Seeded ${count} ETFs with real FMP data.`);
@@ -350,7 +374,9 @@ async function main() {
   }
 
   try {
-    await seedStocksFromFMP();
+    const candidates = await discoverStocks();
+    const qualified = await filterByMarketCap(candidates);
+    await seedStockData(qualified);
   } catch (err) {
     console.error("Stock seeding failed:", (err as Error).message);
   }

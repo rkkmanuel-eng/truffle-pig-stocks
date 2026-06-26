@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertDividendStreak } from "@/lib/db";
-import { getDividendHistory, calculateDividendStreak, getAllTrackedSymbols } from "@/lib/fmp";
+import { upsertDividendStreak, getAllStockSymbols } from "@/lib/db";
+import { getDividendHistory, calculateDividendStreak, SP500_SAMPLE } from "@/lib/fmp";
 
 export const maxDuration = 900;
 
@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
   }
 
-  const symbols = await getAllTrackedSymbols();
+  const dbSymbols = getAllStockSymbols();
+  const symbols = dbSymbols.length > 0 ? dbSymbols : SP500_SAMPLE;
   const startTime = Date.now();
   const results: { symbol: string; streak: number }[] = [];
   const errors: string[] = [];

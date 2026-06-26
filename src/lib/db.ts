@@ -257,6 +257,11 @@ export function getStockCount(): number {
   return row.count;
 }
 
+export function getAllStockSymbols(): string[] {
+  const rows = getDb().prepare("SELECT symbol FROM stocks ORDER BY symbol").all() as { symbol: string }[];
+  return rows.map((r) => r.symbol);
+}
+
 export function recordQualification(symbol: string, strategySlug: string) {
   getDb()
     .prepare(

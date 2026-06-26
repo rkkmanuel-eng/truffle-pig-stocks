@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertStock, getStockCount } from "@/lib/db";
+import { upsertStock, getStockCount, getAllStockSymbols } from "@/lib/db";
 import {
-  getProfiles,
+  getProfile,
+  getQuote,
   getRatiosTTM,
-  getKeyMetricsTTM,
-  getSMA,
   getDCF,
-  getPEGRatio,
-  getAllTrackedSymbols,
   DOW_SYMBOLS,
+  SP500_SAMPLE,
 } from "@/lib/fmp";
 
 export const maxDuration = 900;
@@ -29,73 +27,63 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
   }
 
-  const symbols = await getAllTrackedSymbols();
+  const dbSymbols = getAllStockSymbols();
+  const symbols = dbSymbols.length > 0 ? dbSymbols : SP500_SAMPLE;
   const startTime = Date.now();
   const results: string[] = [];
   const errors: string[] = [];
-  const batchSize = 5;
 
-  for (let i = 0; i < symbols.length; i += batchSize) {
-    const batch = symbols.slice(i, i + batchSize);
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
 
     try {
-      const profiles = await getProfiles(batch);
+      const [quote, ratios, dcfValue] = await Promise.all([
+        getQuote(symbol),
+        getRatiosTTM(symbol).catch(() => null),
+        getDCF(symbol),
+      ]);
 
-      for (const profile of profiles) {
-        try {
-          const [ratios, keyMetrics, sma50, sma200, dcfValue, pegRatio] =
-            await Promise.all([
-              getRatiosTTM(profile.symbol),
-              getKeyMetricsTTM(profile.symbol),
-              getSMA(profile.symbol, 50),
-              getSMA(profile.symbol, 200),
-              getDCF(profile.symbol),
-              getPEGRatio(profile.symbol),
-            ]);
-
-          const rangeParts = profile.range?.split("-").map(Number);
-          const week52Low = rangeParts?.[0] || null;
-          const week52High = rangeParts?.[1] || null;
-
-          upsertStock({
-            symbol: profile.symbol,
-            name: profile.companyName,
-            sector: profile.sector,
-            price: profile.price,
-            pe_ratio: ratios?.peRatioTTM ?? null,
-            pb_ratio: ratios?.priceToBookRatioTTM ?? null,
-            debt_equity_ratio: ratios?.debtEquityRatioTTM ?? null,
-            current_ratio: ratios?.currentRatioTTM ?? null,
-            dividend_yield: ratios?.dividendYieldTTM ?? null,
-            payout_ratio: ratios?.payoutRatioTTM ?? null,
-            sma_50: sma50,
-            sma_200: sma200,
-            dcf_value: dcfValue,
-            peg_ratio: pegRatio,
-            market_cap: profile.mktCap ?? null,
-            beta: profile.beta ?? null,
-            volume_avg: profile.volAvg ?? null,
-            eps: keyMetrics?.epsTTM ?? null,
-            week52_high: week52High,
-            week52_low: week52Low,
-            industry: profile.industry ?? null,
-            exchange: profile.exchangeShortName ?? null,
-            is_dow: DOW_SYMBOLS.includes(profile.symbol) ? 1 : 0,
-            created_at: null,
-          });
-
-          results.push(profile.symbol);
-        } catch (err) {
-          errors.push(profile.symbol);
-          console.error(`[cron] Failed: ${profile.symbol}`, err);
-        }
+      if (!quote) {
+        errors.push(symbol);
+        continue;
       }
+
+      const profile = i % 7 === 0 ? await getProfile(symbol) : null;
+
+      upsertStock({
+        symbol,
+        name: profile?.companyName ?? symbol,
+        sector: profile?.sector ?? null,
+        price: quote.price,
+        pe_ratio: ratios?.priceToEarningsRatioTTM ?? null,
+        pb_ratio: ratios?.priceToBookRatioTTM ?? null,
+        debt_equity_ratio: ratios?.debtToEquityRatioTTM ?? null,
+        current_ratio: ratios?.currentRatioTTM ?? null,
+        dividend_yield: ratios?.dividendYieldTTM ?? null,
+        payout_ratio: ratios?.dividendPayoutRatioTTM ?? null,
+        sma_50: quote.priceAvg50 ?? null,
+        sma_200: quote.priceAvg200 ?? null,
+        dcf_value: dcfValue,
+        peg_ratio: ratios?.priceToEarningsGrowthRatioTTM ?? null,
+        market_cap: quote.marketCap ?? null,
+        beta: profile?.beta ?? null,
+        volume_avg: profile?.averageVolume ?? null,
+        eps: ratios?.netIncomePerShareTTM ?? null,
+        week52_high: quote.yearHigh ?? null,
+        week52_low: quote.yearLow ?? null,
+        industry: profile?.industry ?? null,
+        exchange: profile?.exchange ?? null,
+        is_dow: DOW_SYMBOLS.includes(symbol) ? 1 : 0,
+        created_at: null,
+      });
+
+      results.push(symbol);
     } catch (err) {
-      errors.push(...batch);
-      console.error(`[cron] Batch failed:`, batch, err);
+      errors.push(symbol);
+      console.error(`[cron] Failed: ${symbol}`, err);
     }
 
-    if (i + batchSize < symbols.length) {
+    if ((i + 1) % 3 === 0 && i + 1 < symbols.length) {
       await sleep(4000);
     }
   }
