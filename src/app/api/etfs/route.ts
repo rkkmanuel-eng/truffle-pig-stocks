@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ETF_SYMBOLS, ETF_META, upsertEtf } from "@/lib/etfs";
 
 const API_KEY = process.env.FMP_API_KEY || "";
-const BASE_URL = "https://financialmodelingprep.com/api/v3";
+const BASE_URL = "https://financialmodelingprep.com/stable";
 
 async function fetchJson<T>(url: string): Promise<T> {
   const separator = url.includes("?") ? "&" : "?";
@@ -45,7 +45,7 @@ export async function POST() {
 
     try {
       const profiles = await fetchJson<FMPEtfProfile[]>(
-        `${BASE_URL}/profile/${batch.join(",")}`
+        `${BASE_URL}/profile?symbol=${batch.join(",")}`
       );
 
       for (const profile of profiles) {
@@ -56,7 +56,7 @@ export async function POST() {
 
           try {
             const holders = await fetchJson<FMPEtfHolder[]>(
-              `${BASE_URL}/etf-holder/${profile.symbol}`
+              `${BASE_URL}/etf-holder?symbol=${profile.symbol}`
             );
             if (holders[0]) {
               totalAssets = holders[0].totalAssets ?? null;
@@ -66,7 +66,7 @@ export async function POST() {
 
           try {
             const perf = await fetchJson<FMPEtfPerformance[]>(
-              `${BASE_URL}/stock-price-change/${profile.symbol}`
+              `${BASE_URL}/stock-price-change?symbol=${profile.symbol}`
             );
             if (perf[0]) {
               ytdReturn = perf[0].ytd ?? null;

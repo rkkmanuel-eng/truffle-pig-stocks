@@ -191,16 +191,16 @@ async function seedStocksFromFMP() {
     const batch = SP500_SAMPLE.slice(i, i + batchSize);
 
     try {
-      const profiles = await fetchJson<any[]>(`${BASE_URL}/profile/${batch.join(",")}`);
+      const profiles = await fetchJson<any[]>(`${BASE_URL}/profile?symbol=${batch.join(",")}`);
 
       for (const p of profiles) {
         try {
           const [ratiosArr, keyMetricsArr, sma50Arr, sma200Arr, dcfArr] = await Promise.all([
-            fetchJson<any[]>(`${BASE_URL}/ratios-ttm/${p.symbol}`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/key-metrics-ttm/${p.symbol}`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/technical_indicator/daily/${p.symbol}?period=50&type=sma`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/technical_indicator/daily/${p.symbol}?period=200&type=sma`).catch(() => []),
-            fetchJson<any[]>(`${BASE_URL}/discounted-cash-flow/${p.symbol}`).catch(() => []),
+            fetchJson<any[]>(`${BASE_URL}/ratios-ttm?symbol=${p.symbol}`).catch(() => []),
+            fetchJson<any[]>(`${BASE_URL}/key-metrics-ttm?symbol=${p.symbol}`).catch(() => []),
+            fetchJson<any[]>(`${BASE_URL}/technical_indicator/daily?symbol=${p.symbol}&period=50&type=sma`).catch(() => []),
+            fetchJson<any[]>(`${BASE_URL}/technical_indicator/daily?symbol=${p.symbol}&period=200&type=sma`).catch(() => []),
+            fetchJson<any[]>(`${BASE_URL}/discounted-cash-flow?symbol=${p.symbol}`).catch(() => []),
           ]);
 
           const ratios = ratiosArr[0] || {};
@@ -273,7 +273,7 @@ async function seedETFsFromFMP() {
   for (let i = 0; i < ETF_SYMBOLS.length; i += batchSize) {
     const batch = ETF_SYMBOLS.slice(i, i + batchSize);
     try {
-      const profiles = await fetchJson<any[]>(`${BASE_URL}/profile/${batch.join(",")}`);
+      const profiles = await fetchJson<any[]>(`${BASE_URL}/profile?symbol=${batch.join(",")}`);
       for (const p of profiles) {
         upsertEtf.run(
           p.symbol,

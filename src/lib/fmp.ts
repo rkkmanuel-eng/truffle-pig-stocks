@@ -41,11 +41,11 @@ async function fetchJson<T>(url: string): Promise<T> {
 export async function getProfiles(symbols: string[]): Promise<FMPProfile[]> {
   if (symbols.length === 0) return [];
   const batch = symbols.join(",");
-  return fetchJson<FMPProfile[]>(`${BASE_URL}/profile/${batch}`);
+  return fetchJson<FMPProfile[]>(`${BASE_URL}/profile?symbol=${batch}`);
 }
 
 export async function getRatiosTTM(symbol: string): Promise<FMPRatios | null> {
-  const data = await fetchJson<FMPRatios[]>(`${BASE_URL}/ratios-ttm/${symbol}`);
+  const data = await fetchJson<FMPRatios[]>(`${BASE_URL}/ratios-ttm?symbol=${symbol}`);
   return data[0] ?? null;
 }
 
@@ -55,13 +55,13 @@ export interface FMPKeyMetrics {
 }
 
 export async function getKeyMetricsTTM(symbol: string): Promise<FMPKeyMetrics | null> {
-  const data = await fetchJson<FMPKeyMetrics[]>(`${BASE_URL}/key-metrics-ttm/${symbol}`);
+  const data = await fetchJson<FMPKeyMetrics[]>(`${BASE_URL}/key-metrics-ttm?symbol=${symbol}`);
   return data[0] ?? null;
 }
 
 export async function getDCF(symbol: string): Promise<number | null> {
   try {
-    const data = await fetchJson<{ dcf: number }[]>(`${BASE_URL}/discounted-cash-flow/${symbol}`);
+    const data = await fetchJson<{ dcf: number }[]>(`${BASE_URL}/discounted-cash-flow?symbol=${symbol}`);
     return data[0]?.dcf ?? null;
   } catch {
     return null;
@@ -70,7 +70,7 @@ export async function getDCF(symbol: string): Promise<number | null> {
 
 export async function getPEGRatio(symbol: string): Promise<number | null> {
   try {
-    const data = await fetchJson<{ pegRatio: number }[]>(`${BASE_URL}/key-metrics-ttm/${symbol}`);
+    const data = await fetchJson<{ pegRatio: number }[]>(`${BASE_URL}/key-metrics-ttm?symbol=${symbol}`);
     return (data[0] as Record<string, number>)?.pegRatioTTM ?? null;
   } catch {
     return null;
@@ -86,7 +86,7 @@ export interface FMPDividendEntry {
 export async function getDividendHistory(symbol: string): Promise<FMPDividendEntry[]> {
   try {
     const data = await fetchJson<{ historical: FMPDividendEntry[] }>(
-      `${BASE_URL}/historical-price-full/stock_dividend/${symbol}`
+      `${BASE_URL}/historical-price-full/stock_dividend?symbol=${symbol}`
     );
     return data.historical ?? [];
   } catch {
@@ -137,7 +137,7 @@ export function calculateDividendStreak(history: FMPDividendEntry[]): number {
 
 export async function getSMA(symbol: string, period: number): Promise<number | null> {
   const data = await fetchJson<FMPTechnical[]>(
-    `${BASE_URL}/technical_indicator/daily/${symbol}?period=${period}&type=sma`
+    `${BASE_URL}/technical_indicator/daily?symbol=${symbol}&period=${period}&type=sma`
   );
   return data[0]?.sma ?? null;
 }
