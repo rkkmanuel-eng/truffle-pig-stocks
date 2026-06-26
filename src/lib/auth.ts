@@ -2,11 +2,13 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { getUserById, type UserRow } from "./db";
 
-const jwtSecret = process.env.JWT_SECRET;
-if (!jwtSecret && process.env.NODE_ENV === "production") {
-  throw new Error("JWT_SECRET environment variable is required in production");
+function getSecret() {
+  const jwtSecret = process.env.JWT_SECRET;
+  if (!jwtSecret && process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET environment variable is required in production");
+  }
+  return new TextEncoder().encode(jwtSecret || "dev-only-secret-do-not-use-in-prod");
 }
-const SECRET = new TextEncoder().encode(jwtSecret || "dev-only-secret-do-not-use-in-prod");
 
 const COOKIE_NAME = "qia_session";
 
@@ -29,7 +31,7 @@ export async function createSession(user: UserRow): Promise<string> {
   const token = await new SignJWT({ userId: user.id })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime(`${TOKEN_MAX_AGE_DAYS}d`)
-    .sign(SECRET);
+    .sign(getSecret());
 
   const jar = await cookies();
   jar.set(COOKIE_NAME, token, {
@@ -49,7 +51,7 @@ export async function getSession(): Promise<SessionUser | null> {
   if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     const userId = payload.userId as number;
     const user = getUserById(userId);
     if (!user) return null;
