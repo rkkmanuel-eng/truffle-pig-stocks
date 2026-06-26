@@ -1,31 +1,76 @@
 import { STRATEGIES } from "@/lib/strategies";
-import StrategyCard from "@/components/StrategyCard";
+import { screenStocks } from "@/lib/screener";
+import { evaluateAll } from "@/lib/valuations";
+import { getDividendTiers } from "@/lib/dividends";
 
-export default function Home() {
+import StrategyColumn from "@/components/StrategyColumn";
+import ValuationColumn from "@/components/ValuationColumn";
+import DividendTierColumn from "@/components/DividendTierColumn";
+
+import GlobalThreshold from "@/components/GlobalThreshold";
+import ScrollHint from "@/components/ScrollHint";
+import StockSearch from "@/components/StockSearch";
+import UserMenu from "@/components/UserMenu";
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ buffer?: string }>;
+}) {
+  const { buffer: bufferParam } = await searchParams;
+  const buffer = Math.min(20, Math.max(0, Number(bufferParam) || 0));
+
+  const strategyColumns = STRATEGIES.map((strategy) => ({
+    strategy,
+    stocks: screenStocks(strategy, buffer),
+  }));
+
+  const valuationResults = evaluateAll();
+  const dividendTiers = getDividendTiers();
+
   return (
-    <main className="max-w-4xl mx-auto px-4 py-12">
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold mb-2">Quality Investment Alerts</h1>
-        <p className="text-gray-600">
-          Find stocks that meet proven investing criteria and get notified when they cross key
-          thresholds.
-        </p>
+    <main className="max-w-[1800px] mx-auto px-4 py-8">
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--th-text)]">🐷 Truffle Pig Stocks</h1>
+          <p className="text-sm text-[var(--th-text-faint)] mt-1">
+            We dig up value stocks so you don&apos;t have to get your hooves dirty.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <StockSearch />
+          <UserMenu />
+        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {STRATEGIES.map((strategy) => (
-          <StrategyCard key={strategy.slug} strategy={strategy} />
-        ))}
+      <div className="mb-6">
+        <GlobalThreshold value={buffer} />
       </div>
 
-      <div className="mt-12 p-4 bg-gray-50 rounded-lg text-sm text-gray-500">
-        <p>
-          <strong>How it works:</strong> Each strategy defines specific financial thresholds.
-          Stocks are screened against these criteria daily. You can subscribe to alerts for
-          individual stocks or entire strategies, with an adjustable threshold buffer (0–20%) to
-          get early warnings.
-        </p>
-      </div>
+      <ScrollHint>
+        <div className="flex gap-4" style={{ minWidth: "max-content" }}>
+          {strategyColumns.map(({ strategy, stocks }) => (
+            <div key={strategy.slug} className="w-80 shrink-0">
+              <StrategyColumn strategy={strategy} stocks={stocks} />
+            </div>
+          ))}
+          {dividendTiers.map(({ meta, stocks }) => (
+            <div key={meta.slug} className="w-80 shrink-0">
+              <DividendTierColumn meta={meta} stocks={stocks} />
+            </div>
+          ))}
+          {valuationResults.map(({ meta, buckets }) => (
+            <div key={meta.slug} className="w-80 shrink-0">
+              <ValuationColumn meta={meta} buckets={buckets} />
+            </div>
+          ))}
+
+        </div>
+      </ScrollHint>
+
+      <footer className="mt-8 text-center text-[10px] text-[var(--th-text-ghost)]">
+        Not financial advice. Data from Financial Modeling Prep.
+      </footer>
     </main>
   );
 }

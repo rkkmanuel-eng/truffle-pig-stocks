@@ -1,13 +1,33 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { upsertStock, getStockCount } from "@/lib/db";
-import { getProfiles, getRatiosTTM, getKeyMetricsTTM, getSMA, getDCF, getPEGRatio, SP500_SAMPLE, DOW_SYMBOLS } from "@/lib/fmp";
+import {
+  getProfiles,
+  getRatiosTTM,
+  getKeyMetricsTTM,
+  getSMA,
+  getDCF,
+  getPEGRatio,
+  SP500_SAMPLE,
+  DOW_SYMBOLS,
+} from "@/lib/fmp";
 
-export async function POST() {
+export const maxDuration = 300;
+
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (!process.env.FMP_API_KEY) {
     return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
   }
 
+  const startTime = Date.now();
   const results: string[] = [];
+  const errors: string[] = [];
   const batchSize = 5;
 
   for (let i = 0; i < SP500_SAMPLE.length; i += batchSize) {
@@ -18,14 +38,15 @@ export async function POST() {
 
       for (const profile of profiles) {
         try {
-          const [ratios, keyMetrics, sma50, sma200, dcfValue, pegRatio] = await Promise.all([
-            getRatiosTTM(profile.symbol),
-            getKeyMetricsTTM(profile.symbol),
-            getSMA(profile.symbol, 50),
-            getSMA(profile.symbol, 200),
-            getDCF(profile.symbol),
-            getPEGRatio(profile.symbol),
-          ]);
+          const [ratios, keyMetrics, sma50, sma200, dcfValue, pegRatio] =
+            await Promise.all([
+              getRatiosTTM(profile.symbol),
+              getKeyMetricsTTM(profile.symbol),
+              getSMA(profile.symbol, 50),
+              getSMA(profile.symbol, 200),
+              getDCF(profile.symbol),
+              getPEGRatio(profile.symbol),
+            ]);
 
           const rangeParts = profile.range?.split("-").map(Number);
           const week52Low = rangeParts?.[0] || null;
@@ -60,21 +81,24 @@ export async function POST() {
 
           results.push(profile.symbol);
         } catch (err) {
-          console.error(`Failed to fetch data for ${profile.symbol}:`, err);
+          errors.push(profile.symbol);
+          console.error(`[cron] Failed: ${profile.symbol}`, err);
         }
       }
     } catch (err) {
-      console.error(`Failed to fetch profiles for batch:`, batch, err);
+      errors.push(...batch);
+      console.error(`[cron] Batch failed:`, batch, err);
     }
   }
 
-  return NextResponse.json({
-    updated: results.length,
-    symbols: results,
-    total: getStockCount(),
-  });
-}
+  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
 
-export async function GET() {
-  return NextResponse.json({ total: getStockCount() });
+  return NextResponse.json({
+    ok: true,
+    updated: results.length,
+    failed: errors.length,
+    total: getStockCount(),
+    durationSeconds: duration,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 }

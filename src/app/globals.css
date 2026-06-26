@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --th-bg: #0a0a0a;
+  --th-bg-raised: #141414;
+  --th-bg-sunken: #1a1a1a;
+  --th-bg-chart: #1a1f2e;
+  --th-text: #ffffff;
+  --th-text-secondary: #d1d5db;
+  --th-text-muted: #9ca3af;
+  --th-text-faint: #6b7280;
+  --th-text-ghost: #4b5563;
+  --th-border: rgba(255, 255, 255, 0.1);
+  --th-border-subtle: rgba(255, 255, 255, 0.05);
+  --th-border-focus: rgba(255, 255, 255, 0.3);
+  --th-hover: rgba(255, 255, 255, 0.05);
+  --th-active: rgba(255, 255, 255, 0.1);
+  --th-overlay: rgba(0, 0, 0, 0.6);
+  --th-input: rgba(255, 255, 255, 0.05);
+  --th-scroll-fade: #0a0a0a;
+  --th-arrow-bg: rgba(255, 255, 255, 0.15);
+  --th-arrow-hover: rgba(255, 255, 255, 0.25);
+  --th-arrow-stroke: white;
+  --th-shadow: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] {
+  --th-bg: #f8fafc;
+  --th-bg-raised: #ffffff;
+  --th-bg-sunken: #f1f5f9;
+  --th-bg-chart: #eef2f7;
+  --th-text: #0f172a;
+  --th-text-secondary: #334155;
+  --th-text-muted: #64748b;
+  --th-text-faint: #94a3b8;
+  --th-text-ghost: #cbd5e1;
+  --th-border: rgba(0, 0, 0, 0.1);
+  --th-border-subtle: rgba(0, 0, 0, 0.05);
+  --th-border-focus: rgba(0, 0, 0, 0.25);
+  --th-hover: rgba(0, 0, 0, 0.03);
+  --th-active: rgba(0, 0, 0, 0.06);
+  --th-overlay: rgba(0, 0, 0, 0.4);
+  --th-input: rgba(0, 0, 0, 0.04);
+  --th-scroll-fade: #f8fafc;
+  --th-arrow-bg: rgba(0, 0, 0, 0.08);
+  --th-arrow-hover: rgba(0, 0, 0, 0.15);
+  --th-arrow-stroke: #334155;
+  --th-shadow: rgba(0, 0, 0, 0.1);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--th-bg);
+  --color-foreground: var(--th-text);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--th-bg);
+  color: var(--th-text);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }

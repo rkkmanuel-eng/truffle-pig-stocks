@@ -98,6 +98,48 @@ export const STRATEGIES: Strategy[] = [
       },
     ],
   },
+  {
+    slug: "52-week-low",
+    name: "52-Week Low Bargains",
+    description:
+      "Stocks trading near their 52-week low and well below their high — potential contrarian opportunities.",
+    criteria: [
+      {
+        metric: "pctFrom52Low",
+        label: "% From 52W Low",
+        operator: "<",
+        threshold: 10,
+        unit: "%",
+      },
+      {
+        metric: "pctBelow52High",
+        label: "% Below 52W High",
+        operator: ">",
+        threshold: 20,
+        unit: "%",
+      },
+    ],
+  },
+  {
+    slug: "low-beta",
+    name: "Low Beta Defensive",
+    description:
+      "Low-volatility stocks that move less than the market — ideal for risk-averse investors.",
+    criteria: [
+      {
+        metric: "beta",
+        label: "Beta",
+        operator: "<",
+        threshold: 1.0,
+      },
+      {
+        metric: "currentRatio",
+        label: "Current Ratio",
+        operator: ">",
+        threshold: 1.0,
+      },
+    ],
+  },
 ];
 
 export function getStrategy(slug: string): Strategy | undefined {

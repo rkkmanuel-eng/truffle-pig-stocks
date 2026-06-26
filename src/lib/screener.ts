@@ -1,4 +1,4 @@
-import { StockRow, getAllStocks, getDowStocks } from "./db";
+import { StockRow, getAllStocks, getDowStocks, recordQualification, removeQualification, getQualifications } from "./db";
 import { Strategy, StrategyCriterion, meetsThreshold } from "./strategies";
 
 export interface ScreenedStock {
@@ -9,6 +9,8 @@ export interface ScreenedStock {
   metrics: Record<string, number | null>;
   passing: Record<string, boolean>;
   passesAll: boolean;
+  qualifiedSince: string | null;
+  createdAt: string | null;
 }
 
 function getMetricValue(stock: StockRow, metric: string): number | null {
@@ -31,6 +33,14 @@ function getMetricValue(stock: StockRow, metric: string): number | null {
     case "sma50Above200":
       if (stock.sma_50 == null || stock.sma_200 == null) return null;
       return stock.sma_50 > stock.sma_200 ? 1 : 0;
+    case "pctFrom52Low":
+      if (stock.price == null || stock.week52_low == null || stock.week52_low === 0) return null;
+      return ((stock.price - stock.week52_low) / stock.week52_low) * 100;
+    case "pctBelow52High":
+      if (stock.price == null || stock.week52_high == null || stock.week52_high === 0) return null;
+      return ((stock.week52_high - stock.price) / stock.week52_high) * 100;
+    case "beta":
+      return stock.beta;
     default:
       return null;
   }
@@ -38,6 +48,7 @@ function getMetricValue(stock: StockRow, metric: string): number | null {
 
 export function screenStocks(strategy: Strategy, bufferPercent: number = 0): ScreenedStock[] {
   const stocks = strategy.slug === "dogs-of-the-dow" ? getDowStocks() : getAllStocks();
+  const qualifications = getQualifications(strategy.slug);
 
   const screened: ScreenedStock[] = stocks.map((stock) => {
     const metrics: Record<string, number | null> = {};
@@ -49,6 +60,16 @@ export function screenStocks(strategy: Strategy, bufferPercent: number = 0): Scr
       passing[criterion.metric] = value != null && meetsThreshold(value, criterion, bufferPercent);
     }
 
+    const passesAll = Object.values(passing).every(Boolean);
+
+    if (passesAll && !qualifications[stock.symbol]) {
+      recordQualification(stock.symbol, strategy.slug);
+      qualifications[stock.symbol] = new Date().toISOString();
+    } else if (!passesAll && qualifications[stock.symbol]) {
+      removeQualification(stock.symbol, strategy.slug);
+      delete qualifications[stock.symbol];
+    }
+
     return {
       symbol: stock.symbol,
       name: stock.name,
@@ -56,7 +77,9 @@ export function screenStocks(strategy: Strategy, bufferPercent: number = 0): Scr
       price: stock.price,
       metrics,
       passing,
-      passesAll: Object.values(passing).every(Boolean),
+      passesAll,
+      qualifiedSince: qualifications[stock.symbol] ?? null,
+      createdAt: stock.created_at ?? null,
     };
   });
 
