@@ -133,7 +133,7 @@ const DOW_SYMBOLS = [
   "MSFT", "NKE", "PG", "SHW", "TRV", "UNH", "V", "VZ", "WBA", "WMT",
 ];
 
-const SP500_SAMPLE = [
+const FALLBACK_SYMBOLS = [
   ...DOW_SYMBOLS,
   "GOOGL", "AMZN", "META", "TSLA", "NVDA", "BRK-B", "LLY", "AVGO", "XOM",
   "PEP", "COST", "ADBE", "NFLX", "AMD", "QCOM", "INTC", "CMCSA", "TXN",
@@ -141,6 +141,22 @@ const SP500_SAMPLE = [
   "LOW", "T", "SCHW", "MS", "BLK", "GILD", "AMAT", "ADP", "PFE", "C",
   "USB", "SO", "DUK", "EMR", "CL", "APD", "ITW", "MMC", "GD", "FDX",
 ];
+
+async function getTrackedSymbols(): Promise<string[]> {
+  try {
+    const [sp500, nasdaq] = await Promise.all([
+      fetchJson<{ symbol: string }[]>(`${BASE_URL}/sp500_constituent`).catch(() => []),
+      fetchJson<{ symbol: string }[]>(`${BASE_URL}/nasdaq_constituent`).catch(() => []),
+    ]);
+    const unique = [...new Set([
+      ...sp500.map((d) => d.symbol),
+      ...nasdaq.map((d) => d.symbol),
+    ])];
+    if (unique.length > 0) return unique;
+  } catch {}
+  console.log("  Could not fetch index constituents, using fallback list.");
+  return FALLBACK_SYMBOLS;
+}
 
 const ETF_SYMBOLS = [
   "SPY", "IVV", "VOO", "VTI", "QQQ", "VEA", "VTV", "BND", "AGG", "IEFA",
@@ -183,12 +199,13 @@ const upsertStreak = db.prepare(`
 // --- Fetch real stock data ---
 
 async function seedStocksFromFMP() {
-  console.log(`Fetching real data for ${SP500_SAMPLE.length} stocks from FMP...`);
+  const symbols = await getTrackedSymbols();
+  console.log(`Fetching real data for ${symbols.length} stocks from FMP...`);
   let count = 0;
   const batchSize = 5;
 
-  for (let i = 0; i < SP500_SAMPLE.length; i += batchSize) {
-    const batch = SP500_SAMPLE.slice(i, i + batchSize);
+  for (let i = 0; i < symbols.length; i += batchSize) {
+    const batch = symbols.slice(i, i + batchSize);
 
     try {
       const profiles = await fetchJson<any[]>(`${BASE_URL}/profile?symbol=${batch.join(",")}`);
@@ -242,9 +259,12 @@ async function seedStocksFromFMP() {
       console.error(`  Batch failed: ${batch.join(",")}`, (err as Error).message);
     }
 
-    // Small delay between batches to avoid rate limits
-    if (i + batchSize < SP500_SAMPLE.length) {
-      await sleep(200);
+    if (i + batchSize < symbols.length) {
+      await sleep(4000);
+    }
+
+    if ((i / batchSize) % 10 === 9) {
+      console.log(`  Progress: ${Math.min(i + batchSize, symbols.length)}/${symbols.length} stocks...`);
     }
   }
 

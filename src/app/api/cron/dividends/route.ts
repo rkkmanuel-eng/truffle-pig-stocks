@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { upsertDividendStreak } from "@/lib/db";
-import { getDividendHistory, calculateDividendStreak, SP500_SAMPLE } from "@/lib/fmp";
+import { getDividendHistory, calculateDividendStreak, getAllTrackedSymbols } from "@/lib/fmp";
 
-export const maxDuration = 300;
+export const maxDuration = 900;
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -16,11 +20,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
   }
 
+  const symbols = await getAllTrackedSymbols();
   const startTime = Date.now();
   const results: { symbol: string; streak: number }[] = [];
   const errors: string[] = [];
+  let processed = 0;
 
-  for (const symbol of SP500_SAMPLE) {
+  for (const symbol of symbols) {
     try {
       const history = await getDividendHistory(symbol);
       const streak = calculateDividendStreak(history);
@@ -32,6 +38,11 @@ export async function GET(req: NextRequest) {
       errors.push(symbol);
       console.error(`[cron/dividends] Failed: ${symbol}`, err);
     }
+
+    processed++;
+    if (processed % 5 === 0) {
+      await sleep(4000);
+    }
   }
 
   results.sort((a, b) => b.streak - a.streak);
@@ -39,7 +50,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    processed: SP500_SAMPLE.length,
+    processed: symbols.length,
     qualifyingStreaks: results.length,
     failed: errors.length,
     durationSeconds: duration,

@@ -156,3 +156,23 @@ export const SP500_SAMPLE = [
   "LOW", "T", "SCHW", "MS", "BLK", "GILD", "AMAT", "ADP", "PFE", "C",
   "USB", "SO", "DUK", "EMR", "CL", "APD", "ITW", "MMC", "GD", "FDX",
 ];
+
+export async function getSP500Constituents(): Promise<string[]> {
+  const data = await fetchJson<{ symbol: string }[]>(`${BASE_URL}/sp500_constituent`);
+  return data.map((d) => d.symbol);
+}
+
+export async function getNasdaq100Constituents(): Promise<string[]> {
+  const data = await fetchJson<{ symbol: string }[]>(`${BASE_URL}/nasdaq_constituent`);
+  return data.map((d) => d.symbol);
+}
+
+export async function getAllTrackedSymbols(): Promise<string[]> {
+  const [sp500, nasdaq] = await Promise.all([
+    getSP500Constituents().catch(() => [] as string[]),
+    getNasdaq100Constituents().catch(() => [] as string[]),
+  ]);
+  const unique = [...new Set([...sp500, ...nasdaq])];
+  if (unique.length > 0) return unique;
+  return SP500_SAMPLE;
+}

@@ -7,11 +7,15 @@ import {
   getSMA,
   getDCF,
   getPEGRatio,
-  SP500_SAMPLE,
+  getAllTrackedSymbols,
   DOW_SYMBOLS,
 } from "@/lib/fmp";
 
-export const maxDuration = 300;
+export const maxDuration = 900;
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -25,13 +29,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
   }
 
+  const symbols = await getAllTrackedSymbols();
   const startTime = Date.now();
   const results: string[] = [];
   const errors: string[] = [];
   const batchSize = 5;
 
-  for (let i = 0; i < SP500_SAMPLE.length; i += batchSize) {
-    const batch = SP500_SAMPLE.slice(i, i + batchSize);
+  for (let i = 0; i < symbols.length; i += batchSize) {
+    const batch = symbols.slice(i, i + batchSize);
 
     try {
       const profiles = await getProfiles(batch);
@@ -89,6 +94,10 @@ export async function GET(req: NextRequest) {
       errors.push(...batch);
       console.error(`[cron] Batch failed:`, batch, err);
     }
+
+    if (i + batchSize < symbols.length) {
+      await sleep(4000);
+    }
   }
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -98,6 +107,7 @@ export async function GET(req: NextRequest) {
     updated: results.length,
     failed: errors.length,
     total: getStockCount(),
+    totalTracked: symbols.length,
     durationSeconds: duration,
     errors: errors.length > 0 ? errors : undefined,
   });
