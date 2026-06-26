@@ -16,7 +16,7 @@ export default function StockSearch() {
   const [open, setOpen] = useState(false);
   const [alertSymbol, setAlertSymbol] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
