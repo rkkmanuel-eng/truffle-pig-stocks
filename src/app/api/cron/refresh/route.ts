@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { upsertStock, getStockCount, getAllStockSymbols } from "@/lib/db";
+import { upsertStock, getStockCount, getAllStockSymbols, getStockBySymbol } from "@/lib/db";
 import {
   getProfile,
   getQuote,
@@ -48,12 +48,14 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      const profile = i % 7 === 0 ? await getProfile(symbol) : null;
+      const existing = getStockBySymbol(symbol);
+      const needsProfile = !existing || !existing.sector || existing.name === symbol;
+      const profile = needsProfile ? await getProfile(symbol) : null;
 
       upsertStock({
         symbol,
-        name: profile?.companyName ?? symbol,
-        sector: profile?.sector ?? null,
+        name: profile?.companyName ?? existing?.name ?? symbol,
+        sector: profile?.sector ?? existing?.sector ?? null,
         price: quote.price,
         pe_ratio: ratios?.priceToEarningsRatioTTM ?? null,
         pb_ratio: ratios?.priceToBookRatioTTM ?? null,
@@ -66,13 +68,13 @@ export async function GET(req: NextRequest) {
         dcf_value: dcfValue,
         peg_ratio: ratios?.priceToEarningsGrowthRatioTTM ?? null,
         market_cap: quote.marketCap ?? null,
-        beta: profile?.beta ?? null,
-        volume_avg: profile?.averageVolume ?? null,
+        beta: profile?.beta ?? existing?.beta ?? null,
+        volume_avg: profile?.averageVolume ?? existing?.volume_avg ?? null,
         eps: ratios?.netIncomePerShareTTM ?? null,
         week52_high: quote.yearHigh ?? null,
         week52_low: quote.yearLow ?? null,
-        industry: profile?.industry ?? null,
-        exchange: profile?.exchange ?? null,
+        industry: profile?.industry ?? existing?.industry ?? null,
+        exchange: profile?.exchange ?? existing?.exchange ?? null,
         is_dow: DOW_SYMBOLS.includes(symbol) ? 1 : 0,
         created_at: null,
       });
@@ -84,7 +86,13 @@ export async function GET(req: NextRequest) {
     }
 
     if ((i + 1) % 3 === 0 && i + 1 < symbols.length) {
-      await sleep(4000);
+      await sleep(1200);
+    }
+
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed > 840) {
+      console.log(`[cron/refresh] Time limit approaching at ${i + 1}/${symbols.length}`);
+      break;
     }
   }
 
