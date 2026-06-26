@@ -1,5 +1,5 @@
 const API_KEY = process.env.FMP_API_KEY || "";
-const BASE_URL = "https://financialmodelingprep.com/api/v3";
+const BASE_URL = "https://financialmodelingprep.com/stable";
 
 export interface FMPProfile {
   symbol: string;

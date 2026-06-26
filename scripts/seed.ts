@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import path from "path";
 
 const API_KEY = process.env.FMP_API_KEY || "";
-const BASE_URL = "https://financialmodelingprep.com/api/v3";
+const BASE_URL = "https://financialmodelingprep.com/stable";
 const DB_DIR = process.env.DB_DIR || process.cwd();
 
 const db = new Database(path.join(DB_DIR, "data.db"));
