@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { upsertStock, getStockCount, getAllStockSymbols, getStockBySymbol } from "@/lib/db";
 import {
@@ -16,7 +15,23 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function refreshStocks() {
+export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (cronSecret) {
+    const authHeader = req.headers.get("authorization");
+    const querySecret = req.nextUrl.searchParams.get("secret");
+    const authorized =
+      authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
+    if (!authorized) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  if (!process.env.FMP_API_KEY) {
+    return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
+  }
+
   const dbSymbols = getAllStockSymbols();
   const symbols = dbSymbols.length > 0 ? dbSymbols : SP500_SAMPLE;
   const startTime = Date.now();
@@ -87,37 +102,13 @@ async function refreshStocks() {
   }
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`[cron/refresh] Done: updated ${updated}, failed ${failed}, total ${getStockCount()}, ${duration}s`);
-}
-
-export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization");
-    const querySecret = req.nextUrl.searchParams.get("secret");
-    const authorized =
-      authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
-    if (!authorized) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
-  if (!process.env.FMP_API_KEY) {
-    return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
-  }
-
-  after(async () => {
-    try {
-      await refreshStocks();
-    } catch (err) {
-      console.error("[cron/refresh] Fatal:", err);
-    }
-  });
 
   return NextResponse.json({
     ok: true,
-    message: "Refresh started in background",
-    totalTracked: getAllStockSymbols().length,
+    updated,
+    failed,
+    total: getStockCount(),
+    totalTracked: symbols.length,
+    durationSeconds: duration,
   });
 }
