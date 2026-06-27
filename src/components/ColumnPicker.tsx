@@ -49,7 +49,13 @@ export function useVisibleColumns(allColumns: ColumnDef[]) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...all]));
   }
 
-  return { visible, loaded, toggle, showAll };
+  function hideAll() {
+    const first = new Set([allColumns[0].id]);
+    setVisible(first);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...first]));
+  }
+
+  return { visible, loaded, toggle, showAll, hideAll };
 }
 
 export default function ColumnPicker({
@@ -57,11 +63,13 @@ export default function ColumnPicker({
   visible,
   onToggle,
   onShowAll,
+  onHideAll,
 }: {
   columns: ColumnDef[];
   visible: Set<string>;
   onToggle: (id: string) => void;
   onShowAll: () => void;
+  onHideAll: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -124,14 +132,12 @@ export default function ColumnPicker({
         >
           <div className="p-2 border-b border-[var(--th-border)] flex items-center justify-between">
             <span className="text-xs font-semibold text-[var(--th-text-muted)]">Show columns</span>
-            {!allVisible && (
-              <button
-                onClick={onShowAll}
-                className="text-[10px] text-[var(--th-accent)] hover:underline cursor-pointer"
-              >
-                Show all
-              </button>
-            )}
+            <button
+              onClick={allVisible ? onHideAll : onShowAll}
+              className="text-[10px] text-[var(--th-accent)] hover:underline cursor-pointer"
+            >
+              {allVisible ? "Deselect all" : "Select all"}
+            </button>
           </div>
           <div className="relative">
             <div

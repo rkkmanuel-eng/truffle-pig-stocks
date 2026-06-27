@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function ColumnsLayout({ columns, filterBar, children }: Props) {
-  const { visible, loaded, toggle, showAll } = useVisibleColumns(columns);
+  const { visible, loaded, toggle, showAll, hideAll } = useVisibleColumns(columns);
 
   const childArray = Children.toArray(children).filter(isValidElement);
 
@@ -30,6 +30,7 @@ export default function ColumnsLayout({ columns, filterBar, children }: Props) {
             visible={visible}
             onToggle={toggle}
             onShowAll={showAll}
+            onHideAll={hideAll}
           />
         </div>
       </div>
