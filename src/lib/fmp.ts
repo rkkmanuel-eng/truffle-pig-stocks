@@ -41,33 +41,34 @@ export interface FMPQuote {
   volume: number;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, noCache = false): Promise<T> {
   const separator = url.includes("?") ? "&" : "?";
   const res = await fetch(`${url}${separator}apikey=${API_KEY}`, {
-    next: { revalidate: 86400 },
+    cache: noCache ? "no-store" : undefined,
+    next: noCache ? undefined : { revalidate: 86400 },
   });
   if (!res.ok) throw new Error(`FMP API error: ${res.status}`);
   return res.json();
 }
 
-export async function getProfile(symbol: string): Promise<FMPProfile | null> {
-  const data = await fetchJson<FMPProfile[]>(`${BASE_URL}/profile?symbol=${symbol}`);
+export async function getProfile(symbol: string, noCache = false): Promise<FMPProfile | null> {
+  const data = await fetchJson<FMPProfile[]>(`${BASE_URL}/profile?symbol=${symbol}`, noCache);
   return data[0] ?? null;
 }
 
-export async function getQuote(symbol: string): Promise<FMPQuote | null> {
-  const data = await fetchJson<FMPQuote[]>(`${BASE_URL}/quote?symbol=${symbol}`);
+export async function getQuote(symbol: string, noCache = false): Promise<FMPQuote | null> {
+  const data = await fetchJson<FMPQuote[]>(`${BASE_URL}/quote?symbol=${symbol}`, noCache);
   return data[0] ?? null;
 }
 
-export async function getRatiosTTM(symbol: string): Promise<FMPRatios | null> {
-  const data = await fetchJson<FMPRatios[]>(`${BASE_URL}/ratios-ttm?symbol=${symbol}`);
+export async function getRatiosTTM(symbol: string, noCache = false): Promise<FMPRatios | null> {
+  const data = await fetchJson<FMPRatios[]>(`${BASE_URL}/ratios-ttm?symbol=${symbol}`, noCache);
   return data[0] ?? null;
 }
 
-export async function getDCF(symbol: string): Promise<number | null> {
+export async function getDCF(symbol: string, noCache = false): Promise<number | null> {
   try {
-    const data = await fetchJson<{ dcf: number }[]>(`${BASE_URL}/discounted-cash-flow?symbol=${symbol}`);
+    const data = await fetchJson<{ dcf: number }[]>(`${BASE_URL}/discounted-cash-flow?symbol=${symbol}`, noCache);
     return data[0]?.dcf ?? null;
   } catch {
     return null;

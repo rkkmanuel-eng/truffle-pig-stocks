@@ -36,9 +36,9 @@ export async function refreshAllStocks() {
 
     try {
       const [quote, ratios, dcfValue] = await Promise.all([
-        getQuote(symbol),
-        getRatiosTTM(symbol).catch(() => null),
-        getDCF(symbol),
+        getQuote(symbol, true),
+        getRatiosTTM(symbol, true).catch(() => null),
+        getDCF(symbol, true),
       ]);
 
       if (!quote) {
@@ -49,7 +49,7 @@ export async function refreshAllStocks() {
 
       const existing = getStockBySymbol(symbol);
       const needsProfile = !existing || !existing.sector || existing.name === symbol;
-      const profile = needsProfile ? await getProfile(symbol) : null;
+      const profile = needsProfile ? await getProfile(symbol, true) : null;
 
       upsertStock({
         symbol,
