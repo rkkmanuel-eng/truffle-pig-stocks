@@ -104,7 +104,22 @@ export function calculateDCF(
   const years = withFCF.length - 1;
 
   const rawGrowth = Math.pow(lastFCF / firstFCF, 1 / years) - 1;
-  const growthRate = Math.max(-0.05, Math.min(0.15, rawGrowth));
+
+  // Tiered cap: 25% for stocks with consistent high growth, 15% otherwise
+  // Requires: CAGR > 15%, majority of years >10% growth, no single year >100% (rules out recovery spikes)
+  let growthCap = 0.15;
+  if (rawGrowth > 0.15 && withFCF.length >= 3) {
+    let aboveThreshold = 0;
+    let hasSpike = false;
+    for (let i = 1; i < withFCF.length; i++) {
+      const yoy = withFCF[i].free_cash_flow! / withFCF[i - 1].free_cash_flow! - 1;
+      if (yoy > 0.10) aboveThreshold++;
+      if (yoy > 1.0) hasSpike = true;
+    }
+    if (!hasSpike && aboveThreshold >= (withFCF.length - 1) * 0.6) growthCap = 0.25;
+  }
+
+  const growthRate = Math.max(-0.05, Math.min(growthCap, rawGrowth));
 
   const riskFreeRate = 0.04;
   const equityPremium = 0.06;
