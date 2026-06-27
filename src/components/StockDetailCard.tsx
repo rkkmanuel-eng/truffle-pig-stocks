@@ -147,7 +147,7 @@ export default function StockDetailCard({ symbol, onClose }: Props) {
               <Stat label="SMA 200" value={fmt(stock.sma_200, 2, "$")} />
             </div>
 
-            {stock.dcf_value != null && stock.price != null && (
+            {stock.dcf_value != null && stock.dcf_value > 0 && stock.price != null && stock.price / stock.dcf_value >= 0.2 && stock.price / stock.dcf_value <= 5 && (
               <FairValueChart price={stock.price} fairValue={stock.dcf_value} symbol={stock.symbol} />
             )}
 

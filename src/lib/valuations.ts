@@ -36,6 +36,7 @@ const METHODS: ValuationMethodInternal[] = [
     evaluate(stock) {
       if (stock.price == null || stock.dcf_value == null || stock.dcf_value <= 0) return null;
       const ratio = stock.price / stock.dcf_value;
+      if (ratio < 0.2 || ratio > 5) return null;
       let bucket: ValuationBucket;
       if (ratio < 0.8) bucket = "undervalued";
       else if (ratio <= 1.2) bucket = "fair";
