@@ -1,14 +1,19 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 export default function GlobalThreshold({ value }: { value: number }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const handleChange = (v: number) => {
-    const params = new URLSearchParams();
-    if (v > 0) params.set("buffer", String(v));
+    const params = new URLSearchParams(searchParams.toString());
+    if (v > 0) {
+      params.set("buffer", String(v));
+    } else {
+      params.delete("buffer");
+    }
     router.push(`${pathname}${params.toString() ? `?${params}` : ""}`);
   };
 

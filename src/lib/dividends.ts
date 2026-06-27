@@ -73,8 +73,8 @@ export interface DividendTierResult {
   stocks: DividendStock[];
 }
 
-export function getDividendTiers(): DividendTierResult[] {
-  const allStocks = getAllStocks();
+export function getDividendTiers(minMarketCap?: number): DividendTierResult[] {
+  const allStocks = getAllStocks(minMarketCap);
   const stockMap = new Map<string, StockRow>();
   for (const s of allStocks) stockMap.set(s.symbol, s);
 

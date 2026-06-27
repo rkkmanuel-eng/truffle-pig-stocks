@@ -106,8 +106,8 @@ export interface ValuationResult {
   buckets: Record<ValuationBucket, ValuatedStock[]>;
 }
 
-export function evaluateAll(): ValuationResult[] {
-  const stocks = getAllStocks();
+export function evaluateAll(minMarketCap?: number): ValuationResult[] {
+  const stocks = getAllStocks(minMarketCap);
 
   return METHODS.map((method) => {
     const buckets: Record<ValuationBucket, ValuatedStock[]> = {

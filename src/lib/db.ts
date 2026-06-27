@@ -163,7 +163,12 @@ export interface SubscriptionRow {
   created_at: string;
 }
 
-export function getAllStocks(): StockRow[] {
+export function getAllStocks(minMarketCap?: number): StockRow[] {
+  if (minMarketCap && minMarketCap > 0) {
+    return getDb()
+      .prepare("SELECT * FROM stocks WHERE market_cap >= ? ORDER BY symbol")
+      .all(minMarketCap) as StockRow[];
+  }
   return getDb().prepare("SELECT * FROM stocks ORDER BY symbol").all() as StockRow[];
 }
 
@@ -246,7 +251,12 @@ export function logAlert(subscriptionId: number, message: string) {
     .run(subscriptionId, message);
 }
 
-export function getDowStocks(): StockRow[] {
+export function getDowStocks(minMarketCap?: number): StockRow[] {
+  if (minMarketCap && minMarketCap > 0) {
+    return getDb()
+      .prepare("SELECT * FROM stocks WHERE is_dow=1 AND market_cap >= ? ORDER BY dividend_yield DESC")
+      .all(minMarketCap) as StockRow[];
+  }
   return getDb()
     .prepare("SELECT * FROM stocks WHERE is_dow=1 ORDER BY dividend_yield DESC")
     .all() as StockRow[];

@@ -46,8 +46,8 @@ function getMetricValue(stock: StockRow, metric: string): number | null {
   }
 }
 
-export function screenStocks(strategy: Strategy, bufferPercent: number = 0): ScreenedStock[] {
-  const stocks = strategy.slug === "dogs-of-the-dow" ? getDowStocks() : getAllStocks();
+export function screenStocks(strategy: Strategy, bufferPercent: number = 0, minMarketCap?: number): ScreenedStock[] {
+  const stocks = strategy.slug === "dogs-of-the-dow" ? getDowStocks(minMarketCap) : getAllStocks(minMarketCap);
   const qualifications = getQualifications(strategy.slug);
 
   const screened: ScreenedStock[] = stocks.map((stock) => {

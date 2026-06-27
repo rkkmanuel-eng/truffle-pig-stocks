@@ -8,6 +8,7 @@ import ValuationColumn from "@/components/ValuationColumn";
 import DividendTierColumn from "@/components/DividendTierColumn";
 
 import GlobalThreshold from "@/components/GlobalThreshold";
+import MarketCapFilter from "@/components/MarketCapFilter";
 import ScrollHint from "@/components/ScrollHint";
 import StockSearch from "@/components/StockSearch";
 import UserMenu from "@/components/UserMenu";
@@ -17,18 +18,19 @@ import type { ColumnDef } from "@/components/ColumnPicker";
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ buffer?: string }>;
+  searchParams: Promise<{ buffer?: string; minCap?: string }>;
 }) {
-  const { buffer: bufferParam } = await searchParams;
+  const { buffer: bufferParam, minCap: minCapParam } = await searchParams;
   const buffer = Math.min(20, Math.max(0, Number(bufferParam) || 0));
+  const minCap = Math.max(0, Number(minCapParam) || 0);
 
   const strategyColumns = STRATEGIES.map((strategy) => ({
     strategy,
-    stocks: screenStocks(strategy, buffer),
+    stocks: screenStocks(strategy, buffer, minCap || undefined),
   }));
 
-  const valuationResults = evaluateAll();
-  const dividendTiers = getDividendTiers();
+  const valuationResults = evaluateAll(minCap || undefined);
+  const dividendTiers = getDividendTiers(minCap || undefined);
 
   const allColumns: ColumnDef[] = [
     ...STRATEGIES.map((s) => ({ id: `strategy-${s.slug}`, label: s.name, group: "Strategies" })),
@@ -51,8 +53,9 @@ export default async function Home({
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col sm:flex-row gap-3">
         <GlobalThreshold value={buffer} />
+        <MarketCapFilter value={minCap} />
       </div>
 
       <ScrollHint>
