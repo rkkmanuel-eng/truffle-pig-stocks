@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import AlertSignup from "./AlertSignup";
+import BellIcon from "./BellIcon";
 
 interface StockData {
   symbol: string;
@@ -79,6 +81,7 @@ function Week52Bar({ price, low, high }: { price: number | null; low: number | n
 export default function StockDetailCard({ symbol, onClose }: Props) {
   const [stock, setStock] = useState<StockData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAlert, setShowAlert] = useState(false);
 
   useEffect(() => {
     fetch(`/api/stocks/${symbol}`)
@@ -111,7 +114,16 @@ export default function StockDetailCard({ symbol, onClose }: Props) {
                   </p>
                 )}
               </div>
-              <button onClick={onClose} className="text-[var(--th-text-faint)] hover:text-[var(--th-text-secondary)] text-2xl leading-none">&times;</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowAlert(true)}
+                  className="text-[var(--th-text-faint)] hover:text-[var(--th-text)] transition-colors p-1"
+                  title={`Set alert for ${symbol}`}
+                >
+                  <BellIcon className="w-5 h-5" />
+                </button>
+                <button onClick={onClose} className="text-[var(--th-text-faint)] hover:text-[var(--th-text-secondary)] text-2xl leading-none">&times;</button>
+              </div>
             </div>
 
             <div className="flex items-baseline gap-2 mb-1">
@@ -137,6 +149,10 @@ export default function StockDetailCard({ symbol, onClose }: Props) {
 
             {stock.dcf_value != null && stock.price != null && (
               <FairValueChart price={stock.price} fairValue={stock.dcf_value} symbol={stock.symbol} />
+            )}
+
+            {showAlert && (
+              <AlertSignup symbol={symbol} onClose={() => setShowAlert(false)} />
             )}
           </>
         )}

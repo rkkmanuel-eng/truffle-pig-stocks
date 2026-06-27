@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import AlertSignup from "./AlertSignup";
-import BellIcon from "./BellIcon";
+import StockDetailCard from "./StockDetailCard";
 
 interface StockResult {
   symbol: string;
@@ -14,7 +13,7 @@ export default function StockSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StockResult[]>([]);
   const [open, setOpen] = useState(false);
-  const [alertSymbol, setAlertSymbol] = useState<string | null>(null);
+  const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -69,7 +68,11 @@ export default function StockSearch() {
             {results.map((stock) => (
               <div
                 key={stock.symbol}
-                className="flex items-center justify-between px-3 py-2 hover:bg-[var(--th-hover)] transition-colors group"
+                onClick={() => {
+                  setDetailSymbol(stock.symbol);
+                  setOpen(false);
+                }}
+                className="flex items-center justify-between px-3 py-2 hover:bg-[var(--th-hover)] transition-colors cursor-pointer"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -80,26 +83,16 @@ export default function StockSearch() {
                   </div>
                   <div className="text-xs text-[var(--th-text-faint)] truncate">{stock.name}</div>
                 </div>
-                <button
-                  onClick={() => {
-                    setAlertSymbol(stock.symbol);
-                    setOpen(false);
-                  }}
-                  className="text-[var(--th-text-ghost)] hover:text-[var(--th-text)] transition-colors p-1 shrink-0"
-                  title={`Set alert for ${stock.symbol}`}
-                >
-                  <BellIcon />
-                </button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {alertSymbol && (
-        <AlertSignup
-          symbol={alertSymbol}
-          onClose={() => setAlertSymbol(null)}
+      {detailSymbol && (
+        <StockDetailCard
+          symbol={detailSymbol}
+          onClose={() => setDetailSymbol(null)}
         />
       )}
     </>
