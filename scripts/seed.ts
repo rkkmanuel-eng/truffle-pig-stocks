@@ -98,6 +98,26 @@ db.exec(`
     avg_volume REAL,
     updated_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS financials (
+    symbol TEXT NOT NULL,
+    fiscal_year INTEGER NOT NULL,
+    revenue REAL,
+    net_income REAL,
+    eps_diluted REAL,
+    total_equity REAL,
+    total_debt REAL,
+    total_assets REAL,
+    total_current_assets REAL,
+    total_current_liabilities REAL,
+    operating_cash_flow REAL,
+    capital_expenditure REAL,
+    free_cash_flow REAL,
+    dividends_paid REAL,
+    shares_outstanding REAL,
+    fetched_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (symbol, fiscal_year)
+  );
 `);
 
 function addColumnIfMissing(table: string, column: string, type: string) {

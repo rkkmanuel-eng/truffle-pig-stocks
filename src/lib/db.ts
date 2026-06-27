@@ -111,6 +111,26 @@ function migrate(db: Database.Database) {
       avg_volume REAL,
       updated_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS financials (
+      symbol TEXT NOT NULL,
+      fiscal_year INTEGER NOT NULL,
+      revenue REAL,
+      net_income REAL,
+      eps_diluted REAL,
+      total_equity REAL,
+      total_debt REAL,
+      total_assets REAL,
+      total_current_assets REAL,
+      total_current_liabilities REAL,
+      operating_cash_flow REAL,
+      capital_expenditure REAL,
+      free_cash_flow REAL,
+      dividends_paid REAL,
+      shares_outstanding REAL,
+      fetched_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (symbol, fiscal_year)
+    );
   `);
 
   addColumnIfMissing(db, "users", "email_verified", "INTEGER DEFAULT 0");
@@ -447,4 +467,58 @@ export function setMetadata(key: string, value: string) {
   getDb()
     .prepare("INSERT INTO metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
     .run(key, value);
+}
+
+export interface FinancialRow {
+  symbol: string;
+  fiscal_year: number;
+  revenue: number | null;
+  net_income: number | null;
+  eps_diluted: number | null;
+  total_equity: number | null;
+  total_debt: number | null;
+  total_assets: number | null;
+  total_current_assets: number | null;
+  total_current_liabilities: number | null;
+  operating_cash_flow: number | null;
+  capital_expenditure: number | null;
+  free_cash_flow: number | null;
+  dividends_paid: number | null;
+  shares_outstanding: number | null;
+  fetched_at: string;
+}
+
+export function getFinancials(symbol: string): FinancialRow[] {
+  return getDb()
+    .prepare("SELECT * FROM financials WHERE symbol = ? ORDER BY fiscal_year DESC")
+    .all(symbol) as FinancialRow[];
+}
+
+export function hasFinancials(symbol: string): boolean {
+  const row = getDb()
+    .prepare("SELECT 1 FROM financials WHERE symbol = ? LIMIT 1")
+    .get(symbol);
+  return !!row;
+}
+
+export function upsertFinancial(f: Omit<FinancialRow, "fetched_at">) {
+  getDb()
+    .prepare(
+      `INSERT INTO financials (symbol, fiscal_year, revenue, net_income, eps_diluted,
+         total_equity, total_debt, total_assets, total_current_assets, total_current_liabilities,
+         operating_cash_flow, capital_expenditure, free_cash_flow, dividends_paid, shares_outstanding)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(symbol, fiscal_year) DO UPDATE SET
+         revenue=excluded.revenue, net_income=excluded.net_income, eps_diluted=excluded.eps_diluted,
+         total_equity=excluded.total_equity, total_debt=excluded.total_debt, total_assets=excluded.total_assets,
+         total_current_assets=excluded.total_current_assets, total_current_liabilities=excluded.total_current_liabilities,
+         operating_cash_flow=excluded.operating_cash_flow, capital_expenditure=excluded.capital_expenditure,
+         free_cash_flow=excluded.free_cash_flow, dividends_paid=excluded.dividends_paid,
+         shares_outstanding=excluded.shares_outstanding, fetched_at=datetime('now')`
+    )
+    .run(
+      f.symbol, f.fiscal_year, f.revenue, f.net_income, f.eps_diluted,
+      f.total_equity, f.total_debt, f.total_assets, f.total_current_assets, f.total_current_liabilities,
+      f.operating_cash_flow, f.capital_expenditure, f.free_cash_flow, f.dividends_paid, f.shares_outstanding
+    );
 }

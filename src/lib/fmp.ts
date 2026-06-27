@@ -75,6 +75,61 @@ export async function getDCF(symbol: string, noCache = false): Promise<number | 
   }
 }
 
+export interface FMPIncomeStatement {
+  calendarYear: string;
+  revenue: number;
+  netIncome: number;
+  epsdiluted: number;
+  weightedAverageShsOutDil: number;
+}
+
+export interface FMPCashFlow {
+  calendarYear: string;
+  operatingCashFlow: number;
+  capitalExpenditure: number;
+  freeCashFlow: number;
+  dividendsPaid: number;
+}
+
+export interface FMPBalanceSheet {
+  calendarYear: string;
+  totalStockholdersEquity: number;
+  totalDebt: number;
+  totalAssets: number;
+  totalCurrentAssets: number;
+  totalCurrentLiabilities: number;
+}
+
+export async function getIncomeStatements(symbol: string): Promise<FMPIncomeStatement[]> {
+  try {
+    return await fetchJson<FMPIncomeStatement[]>(
+      `${BASE_URL}/income-statement?symbol=${symbol}&period=annual&limit=5`, true
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function getCashFlowStatements(symbol: string): Promise<FMPCashFlow[]> {
+  try {
+    return await fetchJson<FMPCashFlow[]>(
+      `${BASE_URL}/cash-flow-statement?symbol=${symbol}&period=annual&limit=5`, true
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function getBalanceSheets(symbol: string): Promise<FMPBalanceSheet[]> {
+  try {
+    return await fetchJson<FMPBalanceSheet[]>(
+      `${BASE_URL}/balance-sheet-statement?symbol=${symbol}&period=annual&limit=5`, true
+    );
+  } catch {
+    return [];
+  }
+}
+
 export interface FMPDividendEntry {
   date: string;
   adjDividend: number;
