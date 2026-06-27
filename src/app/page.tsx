@@ -9,7 +9,6 @@ import DividendTierColumn from "@/components/DividendTierColumn";
 
 import GlobalThreshold from "@/components/GlobalThreshold";
 import MarketCapFilter from "@/components/MarketCapFilter";
-import ScrollHint from "@/components/ScrollHint";
 import StockSearch from "@/components/StockSearch";
 import UserMenu from "@/components/UserMenu";
 import ColumnsLayout from "@/components/ColumnsLayout";
@@ -53,30 +52,31 @@ export default async function Home({
         </div>
       </div>
 
-      <div className="mb-6 flex flex-col sm:flex-row gap-3">
-        <GlobalThreshold value={buffer} />
-        <MarketCapFilter value={minCap} />
-      </div>
-
-      <ScrollHint>
-        <ColumnsLayout columns={allColumns}>
-          {strategyColumns.map(({ strategy, stocks }) => (
-            <div key={strategy.slug} className="w-80 shrink-0" data-column-id={`strategy-${strategy.slug}`}>
-              <StrategyColumn strategy={strategy} stocks={stocks} />
-            </div>
-          ))}
-          {dividendTiers.map(({ meta, stocks }) => (
-            <div key={meta.slug} className="w-80 shrink-0" data-column-id={`dividend-${meta.slug}`}>
-              <DividendTierColumn meta={meta} stocks={stocks} />
-            </div>
-          ))}
-          {valuationResults.map(({ meta, buckets }) => (
-            <div key={meta.slug} className="w-80 shrink-0" data-column-id={`valuation-${meta.slug}`}>
-              <ValuationColumn meta={meta} buckets={buckets} />
-            </div>
-          ))}
-        </ColumnsLayout>
-      </ScrollHint>
+      <ColumnsLayout
+        columns={allColumns}
+        filterBar={
+          <>
+            <GlobalThreshold value={buffer} />
+            <MarketCapFilter value={minCap} />
+          </>
+        }
+      >
+        {strategyColumns.map(({ strategy, stocks }) => (
+          <div key={strategy.slug} className="w-80 shrink-0" data-column-id={`strategy-${strategy.slug}`}>
+            <StrategyColumn strategy={strategy} stocks={stocks} />
+          </div>
+        ))}
+        {dividendTiers.map(({ meta, stocks }) => (
+          <div key={meta.slug} className="w-80 shrink-0" data-column-id={`dividend-${meta.slug}`}>
+            <DividendTierColumn meta={meta} stocks={stocks} />
+          </div>
+        ))}
+        {valuationResults.map(({ meta, buckets }) => (
+          <div key={meta.slug} className="w-80 shrink-0" data-column-id={`valuation-${meta.slug}`}>
+            <ValuationColumn meta={meta} buckets={buckets} />
+          </div>
+        ))}
+      </ColumnsLayout>
 
       <footer className="mt-8 text-center text-[10px] text-[var(--th-text-ghost)]">
         Not financial advice. Data from Financial Modeling Prep.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface ColumnDef {
   id: string;
@@ -65,6 +65,8 @@ export default function ColumnPicker({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [canScrollDown, setCanScrollDown] = useState(false);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -75,6 +77,17 @@ export default function ColumnPicker({
     if (open) document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
+
+  const checkScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    requestAnimationFrame(checkScroll);
+  }, [open, checkScroll]);
 
   const groups = columns.reduce<Record<string, ColumnDef[]>>((acc, col) => {
     (acc[col.group] ??= []).push(col);
@@ -120,28 +133,47 @@ export default function ColumnPicker({
               </button>
             )}
           </div>
-          <div className="max-h-80 overflow-y-auto p-1">
-            {Object.entries(groups).map(([group, cols]) => (
-              <div key={group}>
-                <div className="px-2 pt-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--th-text-ghost)] font-semibold">
-                  {group}
+          <div className="relative">
+            <div
+              ref={listRef}
+              onScroll={checkScroll}
+              className="max-h-72 overflow-y-auto p-1"
+            >
+              {Object.entries(groups).map(([group, cols]) => (
+                <div key={group}>
+                  <div className="px-2 pt-2 pb-1 text-[10px] uppercase tracking-wider text-[var(--th-text-ghost)] font-semibold">
+                    {group}
+                  </div>
+                  {cols.map((col) => (
+                    <label
+                      key={col.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[var(--th-hover)] cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visible.has(col.id)}
+                        onChange={() => onToggle(col.id)}
+                        className="accent-[var(--th-accent)] cursor-pointer"
+                      />
+                      <span className="text-xs text-[var(--th-text)]">{col.label}</span>
+                    </label>
+                  ))}
                 </div>
-                {cols.map((col) => (
-                  <label
-                    key={col.id}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-[var(--th-hover)] cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={visible.has(col.id)}
-                      onChange={() => onToggle(col.id)}
-                      className="accent-[var(--th-accent)] cursor-pointer"
-                    />
-                    <span className="text-xs text-[var(--th-text)]">{col.label}</span>
-                  </label>
-                ))}
+              ))}
+            </div>
+            {canScrollDown && (
+              <div className="absolute bottom-0 left-0 right-0 pointer-events-none">
+                <div className="h-8 bg-gradient-to-t from-[var(--th-bg)] to-transparent" />
+                <div className="bg-[var(--th-bg)] text-center pb-1.5">
+                  <span className="text-[10px] text-[var(--th-text-ghost)] pointer-events-auto flex items-center justify-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                    Scroll for more
+                  </span>
+                </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
