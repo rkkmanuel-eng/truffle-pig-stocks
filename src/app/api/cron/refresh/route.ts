@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { upsertStock, getStockCount, getAllStockSymbols, getStockBySymbol } from "@/lib/db";
 import {
@@ -8,6 +9,8 @@ import {
   DOW_SYMBOLS,
   SP500_SAMPLE,
 } from "@/lib/fmp";
+
+export const maxDuration = 900;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -104,7 +107,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
   }
 
-  refreshStocks().catch((err) => console.error("[cron/refresh] Fatal:", err));
+  after(async () => {
+    try {
+      await refreshStocks();
+    } catch (err) {
+      console.error("[cron/refresh] Fatal:", err);
+    }
+  });
 
   return NextResponse.json({
     ok: true,

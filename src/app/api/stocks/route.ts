@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { upsertStock, getStockCount, getAllStockSymbols, getStockBySymbol } from "@/lib/db";
 import { getProfile, getQuote, getRatiosTTM, getDCF, SP500_SAMPLE, DOW_SYMBOLS } from "@/lib/fmp";
@@ -8,16 +9,12 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function POST() {
-  if (!process.env.FMP_API_KEY) {
-    return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
-  }
-
+async function refreshStocks() {
   const dbSymbols = getAllStockSymbols();
   const symbols = dbSymbols.length > 0 ? dbSymbols : SP500_SAMPLE;
   const startTime = Date.now();
-  const results: string[] = [];
-  const errors: string[] = [];
+  let updated = 0;
+  let failed = 0;
 
   for (let i = 0; i < symbols.length; i++) {
     const symbol = symbols[i];
@@ -28,10 +25,7 @@ export async function POST() {
         getDCF(symbol),
       ]);
 
-      if (!quote) {
-        errors.push(symbol);
-        continue;
-      }
+      if (!quote) { failed++; continue; }
 
       const existing = getStockBySymbol(symbol);
       const needsProfile = !existing || !existing.sector || existing.name === symbol;
@@ -64,9 +58,9 @@ export async function POST() {
         created_at: null,
       });
 
-      results.push(symbol);
+      updated++;
     } catch (err) {
-      errors.push(symbol);
+      failed++;
       console.error(`[stocks] Failed: ${symbol}`, err);
     }
 
@@ -76,19 +70,31 @@ export async function POST() {
 
     const elapsed = (Date.now() - startTime) / 1000;
     if (elapsed > 840) {
-      console.log(`[stocks] Time limit at ${i + 1}/${symbols.length}`);
+      console.log(`[stocks] Time limit at ${i + 1}/${symbols.length}, updated ${updated}`);
       break;
     }
   }
 
-  const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[stocks] Done: updated ${updated}, failed ${failed}, ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
+}
+
+export async function POST() {
+  if (!process.env.FMP_API_KEY) {
+    return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
+  }
+
+  after(async () => {
+    try {
+      await refreshStocks();
+    } catch (err) {
+      console.error("[stocks POST] Fatal:", err);
+    }
+  });
 
   return NextResponse.json({
-    updated: results.length,
-    failed: errors.length,
+    ok: true,
+    message: "Refresh started in background",
     total: getStockCount(),
-    totalTracked: symbols.length,
-    durationSeconds: duration,
   });
 }
 
