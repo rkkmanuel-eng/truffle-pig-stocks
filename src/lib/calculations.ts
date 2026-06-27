@@ -104,7 +104,7 @@ export function calculateDCF(
   const years = withFCF.length - 1;
 
   const rawGrowth = Math.pow(lastFCF / firstFCF, 1 / years) - 1;
-  const growthRate = Math.max(-0.05, Math.min(0.20, rawGrowth));
+  const growthRate = Math.max(-0.05, Math.min(0.15, rawGrowth));
 
   const riskFreeRate = 0.04;
   const equityPremium = 0.06;
@@ -114,8 +114,12 @@ export function calculateDCF(
   const terminalGrowth = 0.025;
   if (wacc <= terminalGrowth) return null;
 
+  // Use average of last 3 years' FCF to smooth out cyclical spikes
+  const recent = withFCF.slice(-3);
+  const baseFCF = recent.reduce((sum, f) => sum + f.free_cash_flow!, 0) / recent.length;
+
   let totalPV = 0;
-  let projFCF = lastFCF;
+  let projFCF = baseFCF;
   for (let i = 1; i <= 5; i++) {
     projFCF *= 1 + growthRate;
     totalPV += projFCF / Math.pow(1 + wacc, i);
