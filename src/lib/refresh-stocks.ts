@@ -70,7 +70,7 @@ async function fetchAndStoreFinancials(symbol: string): Promise<boolean> {
   }
 }
 
-export async function refreshAllStocks() {
+export async function refreshAllStocks({ refreshFinancials = false } = {}) {
   if (!process.env.FMP_API_KEY) {
     console.error("[refresh] FMP_API_KEY not set, skipping");
     return;
@@ -96,7 +96,7 @@ export async function refreshAllStocks() {
     try {
       const existing = getStockBySymbol(symbol);
       const needsProfile = !existing || !existing.sector || existing.name === symbol;
-      const needsFinancials = !hasFinancials(symbol);
+      const needsFinancials = refreshFinancials || !hasFinancials(symbol);
 
       const fetchPromises: Promise<unknown>[] = [getQuote(symbol, true)];
       if (needsProfile) fetchPromises.push(getProfile(symbol, true));
