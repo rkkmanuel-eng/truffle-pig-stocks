@@ -6,6 +6,7 @@ import {
 import {
   getProfile,
   getQuote,
+  getRatiosTTM,
   getIncomeStatements,
   getCashFlowStatements,
   getBalanceSheets,
@@ -17,7 +18,6 @@ import {
   calculateDCF, calculatePE, calculatePB,
   calculateDE, calculateCurrentRatio,
   calculateEPSGrowth, calculatePEG,
-  calculateDividendYield, calculatePayoutRatio,
   buildTTM, buildAnnualSeries,
   type QuarterlyFinancial,
 } from "./calculations";
@@ -116,12 +116,13 @@ export async function refreshAllStocks({ refreshFinancials = false } = {}) {
       const needsProfile = !existing || !existing.sector || existing.name === symbol;
       const needsFinancials = refreshFinancials || !hasFinancials(symbol);
 
-      const fetchPromises: Promise<unknown>[] = [getQuote(symbol, true)];
+      const fetchPromises: Promise<unknown>[] = [getQuote(symbol, true), getRatiosTTM(symbol, true)];
       if (needsProfile) fetchPromises.push(getProfile(symbol, true));
 
       const results = await Promise.all(fetchPromises);
       const quote = results[0] as Awaited<ReturnType<typeof getQuote>>;
-      const profile = needsProfile ? results[1] as Awaited<ReturnType<typeof getProfile>> : null;
+      const ratios = results[1] as Awaited<ReturnType<typeof getRatiosTTM>>;
+      const profile = needsProfile ? results[2] as Awaited<ReturnType<typeof getProfile>> : null;
 
       if (!quote) {
         failed++;
@@ -193,8 +194,8 @@ export async function refreshAllStocks({ refreshFinancials = false } = {}) {
         pbRatio = calculatePB(quote.price, ttm.total_equity, currentShares);
         deRatio = calculateDE(ttm.total_debt, ttm.total_equity);
         curRatio = calculateCurrentRatio(ttm.total_current_assets, ttm.total_current_liabilities);
-        divYield = calculateDividendYield(ttm.dividends_paid, currentShares, quote.price);
-        payRatio = calculatePayoutRatio(ttm.dividends_paid, ttm.net_income);
+        divYield = ratios?.dividendYieldTTM ?? null;
+        payRatio = ratios?.dividendPayoutRatioTTM ?? null;
 
         const epsGrowth = calculateEPSGrowth(annuals);
         pegRatio = calculatePEG(peRatio, epsGrowth);
