@@ -1,4 +1,4 @@
-import { upsertStock, getAllStockSymbols, getStockBySymbol } from "./db";
+import { upsertStock, getAllStockSymbols, getStockBySymbol, getMetadata, setMetadata } from "./db";
 import {
   getProfile,
   getQuote,
@@ -24,9 +24,14 @@ export async function refreshAllStocks() {
   let updated = 0;
   let failed = 0;
 
-  console.log(`[refresh] Starting update for ${symbols.length} stocks`);
+  const savedOffset = parseInt(getMetadata("refresh_offset") || "0", 10);
+  const startIdx = savedOffset < symbols.length ? savedOffset : 0;
 
-  for (let i = 0; i < symbols.length; i++) {
+  console.log(`[refresh] Starting at offset ${startIdx} (${symbols[startIdx]}) for ${symbols.length} stocks`);
+
+  let processed = 0;
+  for (let n = 0; n < symbols.length; n++) {
+    const i = (startIdx + n) % symbols.length;
     const symbol = symbols[i];
 
     try {
@@ -38,6 +43,7 @@ export async function refreshAllStocks() {
 
       if (!quote) {
         failed++;
+        processed++;
         continue;
       }
 
@@ -78,16 +84,26 @@ export async function refreshAllStocks() {
       console.error(`[refresh] Failed: ${symbol}`, err);
     }
 
-    if ((i + 1) % 3 === 0 && i + 1 < symbols.length) {
+    processed++;
+
+    if (processed % 3 === 0 && processed < symbols.length) {
       await sleep(1200);
     }
 
     const elapsed = (Date.now() - startTime) / 1000;
     if (elapsed > 840) {
-      console.log(`[refresh] Time limit at ${i + 1}/${symbols.length}, updated ${updated}`);
+      const nextOffset = (startIdx + processed) % symbols.length;
+      setMetadata("refresh_offset", String(nextOffset));
+      console.log(`[refresh] Time limit after ${processed} stocks, next offset: ${nextOffset} (${symbols[nextOffset]})`);
       break;
     }
   }
+
+  if (processed >= symbols.length) {
+    setMetadata("refresh_offset", "0");
+  }
+
+  setMetadata("last_refresh_at", new Date().toISOString());
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[refresh] Done: ${updated} updated, ${failed} failed, ${duration}s`);

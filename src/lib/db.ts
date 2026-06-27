@@ -24,6 +24,11 @@ function addColumnIfMissing(db: Database.Database, table: string, column: string
 
 function migrate(db: Database.Database) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS metadata (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS stocks (
       symbol TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -429,4 +434,17 @@ export function getAllDividendStreaks(): Record<string, number> {
     map[row.symbol] = row.streak_years;
   }
   return map;
+}
+
+export function getMetadata(key: string): string | null {
+  const row = getDb()
+    .prepare("SELECT value FROM metadata WHERE key = ?")
+    .get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setMetadata(key: string, value: string) {
+  getDb()
+    .prepare("INSERT INTO metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+    .run(key, value);
 }

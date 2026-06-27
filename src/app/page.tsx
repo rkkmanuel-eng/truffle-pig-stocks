@@ -2,6 +2,7 @@ import { STRATEGIES } from "@/lib/strategies";
 import { screenStocks } from "@/lib/screener";
 import { evaluateAll } from "@/lib/valuations";
 import { getDividendTiers } from "@/lib/dividends";
+import { getMetadata } from "@/lib/db";
 
 import StrategyColumn from "@/components/StrategyColumn";
 import ValuationColumn from "@/components/ValuationColumn";
@@ -12,7 +13,10 @@ import MarketCapFilter from "@/components/MarketCapFilter";
 import StockSearch from "@/components/StockSearch";
 import UserMenu from "@/components/UserMenu";
 import ColumnsLayout from "@/components/ColumnsLayout";
+import LastUpdated from "@/components/LastUpdated";
 import type { ColumnDef } from "@/components/ColumnPicker";
+
+export const dynamic = "force-dynamic";
 
 export default async function Home({
   searchParams,
@@ -22,6 +26,7 @@ export default async function Home({
   const { buffer: bufferParam, minCap: minCapParam } = await searchParams;
   const buffer = Math.min(20, Math.max(0, Number(bufferParam) || 0));
   const minCap = Math.max(0, Number(minCapParam) || 0);
+  const lastRefresh = getMetadata("last_refresh_at");
 
   const strategyColumns = STRATEGIES.map((strategy) => ({
     strategy,
@@ -78,8 +83,14 @@ export default async function Home({
         ))}
       </ColumnsLayout>
 
-      <footer className="mt-8 text-center text-[10px] text-[var(--th-text-ghost)]">
-        Not financial advice. Data from Financial Modeling Prep.
+      <footer className="mt-8 text-center text-[10px] text-[var(--th-text-ghost)] space-y-1">
+        {lastRefresh && (
+          <p>
+            Data last updated:{" "}
+            <LastUpdated iso={lastRefresh} />
+          </p>
+        )}
+        <p>Not financial advice. Data from Financial Modeling Prep.</p>
       </footer>
     </main>
   );
