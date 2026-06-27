@@ -40,15 +40,15 @@ async function fetchAndStoreFinancials(symbol: string): Promise<boolean> {
     const keys = new Set<string>();
     for (const s of incomes) {
       const q = parseFiscalQuarter(s.period);
-      if (q > 0) keys.add(`${parseInt(s.calendarYear)}-${q}`);
+      if (q > 0) keys.add(`${parseInt(s.fiscalYear)}-${q}`);
     }
     for (const s of cashFlows) {
       const q = parseFiscalQuarter(s.period);
-      if (q > 0) keys.add(`${parseInt(s.calendarYear)}-${q}`);
+      if (q > 0) keys.add(`${parseInt(s.fiscalYear)}-${q}`);
     }
     for (const s of balanceSheets) {
       const q = parseFiscalQuarter(s.period);
-      if (q > 0) keys.add(`${parseInt(s.calendarYear)}-${q}`);
+      if (q > 0) keys.add(`${parseInt(s.fiscalYear)}-${q}`);
     }
 
     for (const key of keys) {
@@ -57,9 +57,9 @@ async function fetchAndStoreFinancials(symbol: string): Promise<boolean> {
       const quarter = parseInt(qStr);
       if (isNaN(year) || isNaN(quarter)) continue;
 
-      const inc = incomes.find((s) => parseInt(s.calendarYear) === year && parseFiscalQuarter(s.period) === quarter);
-      const cf = cashFlows.find((s) => parseInt(s.calendarYear) === year && parseFiscalQuarter(s.period) === quarter);
-      const bs = balanceSheets.find((s) => parseInt(s.calendarYear) === year && parseFiscalQuarter(s.period) === quarter);
+      const inc = incomes.find((s) => parseInt(s.fiscalYear) === year && parseFiscalQuarter(s.period) === quarter);
+      const cf = cashFlows.find((s) => parseInt(s.fiscalYear) === year && parseFiscalQuarter(s.period) === quarter);
+      const bs = balanceSheets.find((s) => parseInt(s.fiscalYear) === year && parseFiscalQuarter(s.period) === quarter);
 
       upsertFinancial({
         symbol,
@@ -67,7 +67,7 @@ async function fetchAndStoreFinancials(symbol: string): Promise<boolean> {
         fiscal_quarter: quarter,
         revenue: inc?.revenue ?? null,
         net_income: inc?.netIncome ?? null,
-        eps_diluted: inc?.epsdiluted ?? null,
+        eps_diluted: inc?.epsDiluted ?? null,
         total_equity: bs?.totalStockholdersEquity ?? null,
         total_debt: bs?.totalDebt ?? null,
         total_assets: bs?.totalAssets ?? null,
@@ -76,7 +76,7 @@ async function fetchAndStoreFinancials(symbol: string): Promise<boolean> {
         operating_cash_flow: cf?.operatingCashFlow ?? null,
         capital_expenditure: cf?.capitalExpenditure ?? null,
         free_cash_flow: cf?.freeCashFlow ?? null,
-        dividends_paid: cf?.dividendsPaid ?? null,
+        dividends_paid: cf?.commonDividendsPaid ?? null,
         shares_outstanding: inc?.weightedAverageShsOutDil ?? null,
       });
     }

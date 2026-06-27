@@ -76,25 +76,29 @@ export async function getDCF(symbol: string, noCache = false): Promise<number | 
 }
 
 export interface FMPIncomeStatement {
-  calendarYear: string;
+  calendarYear?: string;
+  fiscalYear: string;
   period: string;
   revenue: number;
   netIncome: number;
   epsdiluted: number;
+  epsDiluted: number;
   weightedAverageShsOutDil: number;
 }
 
 export interface FMPCashFlow {
-  calendarYear: string;
+  calendarYear?: string;
+  fiscalYear: string;
   period: string;
   operatingCashFlow: number;
   capitalExpenditure: number;
   freeCashFlow: number;
-  dividendsPaid: number;
+  commonDividendsPaid: number;
 }
 
 export interface FMPBalanceSheet {
-  calendarYear: string;
+  calendarYear?: string;
+  fiscalYear: string;
   period: string;
   totalStockholdersEquity: number;
   totalDebt: number;
