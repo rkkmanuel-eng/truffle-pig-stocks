@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
   }
 
-  const result = await refreshAllStocks();
+  const withFinancials = req.nextUrl.searchParams.get("financials") === "true";
+  const result = await refreshAllStocks({ refreshFinancials: withFinancials });
 
   return NextResponse.json({
     ok: true,

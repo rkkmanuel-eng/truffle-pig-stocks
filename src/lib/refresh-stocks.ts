@@ -9,6 +9,7 @@ import {
   getIncomeStatements,
   getCashFlowStatements,
   getBalanceSheets,
+  parseFiscalQuarter,
   DOW_SYMBOLS,
   SP500_SAMPLE,
 } from "./fmp";
@@ -17,7 +18,10 @@ import {
   calculateDE, calculateCurrentRatio,
   calculateEPSGrowth, calculatePEG,
   calculateDividendYield, calculatePayoutRatio,
+  buildTTM, buildAnnualSeries,
+  type QuarterlyFinancial,
 } from "./calculations";
+import { DEFAULT_MIN_MARKET_CAP } from "./config";
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -33,20 +37,34 @@ async function fetchAndStoreFinancials(symbol: string): Promise<boolean> {
 
     if (!incomes.length && !cashFlows.length && !balanceSheets.length) return false;
 
-    const years = new Set<number>();
-    for (const s of incomes) years.add(parseInt(s.calendarYear));
-    for (const s of cashFlows) years.add(parseInt(s.calendarYear));
-    for (const s of balanceSheets) years.add(parseInt(s.calendarYear));
+    const keys = new Set<string>();
+    for (const s of incomes) {
+      const q = parseFiscalQuarter(s.period);
+      if (q > 0) keys.add(`${parseInt(s.calendarYear)}-${q}`);
+    }
+    for (const s of cashFlows) {
+      const q = parseFiscalQuarter(s.period);
+      if (q > 0) keys.add(`${parseInt(s.calendarYear)}-${q}`);
+    }
+    for (const s of balanceSheets) {
+      const q = parseFiscalQuarter(s.period);
+      if (q > 0) keys.add(`${parseInt(s.calendarYear)}-${q}`);
+    }
 
-    for (const year of years) {
-      if (isNaN(year)) continue;
-      const inc = incomes.find((s) => parseInt(s.calendarYear) === year);
-      const cf = cashFlows.find((s) => parseInt(s.calendarYear) === year);
-      const bs = balanceSheets.find((s) => parseInt(s.calendarYear) === year);
+    for (const key of keys) {
+      const [yearStr, qStr] = key.split("-");
+      const year = parseInt(yearStr);
+      const quarter = parseInt(qStr);
+      if (isNaN(year) || isNaN(quarter)) continue;
+
+      const inc = incomes.find((s) => parseInt(s.calendarYear) === year && parseFiscalQuarter(s.period) === quarter);
+      const cf = cashFlows.find((s) => parseInt(s.calendarYear) === year && parseFiscalQuarter(s.period) === quarter);
+      const bs = balanceSheets.find((s) => parseInt(s.calendarYear) === year && parseFiscalQuarter(s.period) === quarter);
 
       upsertFinancial({
         symbol,
         fiscal_year: year,
+        fiscal_quarter: quarter,
         revenue: inc?.revenue ?? null,
         net_income: inc?.netIncome ?? null,
         eps_diluted: inc?.epsdiluted ?? null,
@@ -111,14 +129,48 @@ export async function refreshAllStocks({ refreshFinancials = false } = {}) {
         continue;
       }
 
+      const belowMinCap = DEFAULT_MIN_MARKET_CAP > 0 &&
+        quote.marketCap != null && quote.marketCap < DEFAULT_MIN_MARKET_CAP;
+
+      if (belowMinCap) {
+        upsertStock({
+          symbol,
+          name: profile?.companyName ?? existing?.name ?? symbol,
+          sector: profile?.sector ?? existing?.sector ?? null,
+          price: quote.price,
+          pe_ratio: existing?.pe_ratio ?? null,
+          pb_ratio: existing?.pb_ratio ?? null,
+          debt_equity_ratio: existing?.debt_equity_ratio ?? null,
+          current_ratio: existing?.current_ratio ?? null,
+          dividend_yield: existing?.dividend_yield ?? null,
+          payout_ratio: existing?.payout_ratio ?? null,
+          sma_50: quote.priceAvg50 ?? null,
+          sma_200: quote.priceAvg200 ?? null,
+          dcf_value: existing?.dcf_value ?? null,
+          peg_ratio: existing?.peg_ratio ?? null,
+          market_cap: quote.marketCap ?? null,
+          beta: profile?.beta ?? existing?.beta ?? null,
+          volume_avg: profile?.averageVolume ?? existing?.volume_avg ?? null,
+          eps: existing?.eps ?? null,
+          week52_high: quote.yearHigh ?? null,
+          week52_low: quote.yearLow ?? null,
+          industry: profile?.industry ?? existing?.industry ?? null,
+          exchange: profile?.exchange ?? existing?.exchange ?? null,
+          is_dow: DOW_SYMBOLS.includes(symbol) ? 1 : 0,
+          created_at: null,
+        });
+        updated++;
+        processed++;
+        continue;
+      }
+
       if (needsFinancials) {
         const got = await fetchAndStoreFinancials(symbol);
         if (got) financialsFetched++;
         await sleep(600);
       }
 
-      const fins = getFinancials(symbol);
-      const latest = fins[0];
+      const quarters = getFinancials(symbol) as QuarterlyFinancial[];
       const beta = profile?.beta ?? existing?.beta ?? null;
       const currentShares = quote.marketCap && quote.price ? quote.marketCap / quote.price : null;
 
@@ -132,18 +184,21 @@ export async function refreshAllStocks({ refreshFinancials = false } = {}) {
       let dcfValue: number | null = null;
       let eps: number | null = null;
 
-      if (latest && quote.price) {
-        eps = latest.eps_diluted;
-        peRatio = calculatePE(quote.price, eps);
-        pbRatio = calculatePB(quote.price, latest.total_equity, currentShares);
-        deRatio = calculateDE(latest.total_debt, latest.total_equity);
-        curRatio = calculateCurrentRatio(latest.total_current_assets, latest.total_current_liabilities);
-        divYield = calculateDividendYield(latest.dividends_paid, currentShares, quote.price);
-        payRatio = calculatePayoutRatio(latest.dividends_paid, latest.net_income);
+      const ttm = buildTTM(quarters);
+      const annuals = buildAnnualSeries(quarters);
 
-        const epsGrowth = calculateEPSGrowth(fins);
+      if (ttm && quote.price) {
+        eps = ttm.eps_diluted;
+        peRatio = calculatePE(quote.price, eps);
+        pbRatio = calculatePB(quote.price, ttm.total_equity, currentShares);
+        deRatio = calculateDE(ttm.total_debt, ttm.total_equity);
+        curRatio = calculateCurrentRatio(ttm.total_current_assets, ttm.total_current_liabilities);
+        divYield = calculateDividendYield(ttm.dividends_paid, currentShares, quote.price);
+        payRatio = calculatePayoutRatio(ttm.dividends_paid, ttm.net_income);
+
+        const epsGrowth = calculateEPSGrowth(annuals);
         pegRatio = calculatePEG(peRatio, epsGrowth);
-        dcfValue = calculateDCF(fins, beta, currentShares);
+        dcfValue = calculateDCF(annuals, beta, currentShares);
       }
 
       upsertStock({

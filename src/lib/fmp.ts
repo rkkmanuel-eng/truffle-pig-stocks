@@ -77,6 +77,7 @@ export async function getDCF(symbol: string, noCache = false): Promise<number | 
 
 export interface FMPIncomeStatement {
   calendarYear: string;
+  period: string;
   revenue: number;
   netIncome: number;
   epsdiluted: number;
@@ -85,6 +86,7 @@ export interface FMPIncomeStatement {
 
 export interface FMPCashFlow {
   calendarYear: string;
+  period: string;
   operatingCashFlow: number;
   capitalExpenditure: number;
   freeCashFlow: number;
@@ -93,6 +95,7 @@ export interface FMPCashFlow {
 
 export interface FMPBalanceSheet {
   calendarYear: string;
+  period: string;
   totalStockholdersEquity: number;
   totalDebt: number;
   totalAssets: number;
@@ -100,10 +103,15 @@ export interface FMPBalanceSheet {
   totalCurrentLiabilities: number;
 }
 
+export function parseFiscalQuarter(period: string): number {
+  const match = period?.match(/Q(\d)/);
+  return match ? parseInt(match[1]) : 0;
+}
+
 export async function getIncomeStatements(symbol: string): Promise<FMPIncomeStatement[]> {
   try {
     return await fetchJson<FMPIncomeStatement[]>(
-      `${BASE_URL}/income-statement?symbol=${symbol}&period=annual&limit=5`, true
+      `${BASE_URL}/income-statement?symbol=${symbol}&period=quarter&limit=20`, true
     );
   } catch {
     return [];
@@ -113,7 +121,7 @@ export async function getIncomeStatements(symbol: string): Promise<FMPIncomeStat
 export async function getCashFlowStatements(symbol: string): Promise<FMPCashFlow[]> {
   try {
     return await fetchJson<FMPCashFlow[]>(
-      `${BASE_URL}/cash-flow-statement?symbol=${symbol}&period=annual&limit=5`, true
+      `${BASE_URL}/cash-flow-statement?symbol=${symbol}&period=quarter&limit=20`, true
     );
   } catch {
     return [];
@@ -123,7 +131,7 @@ export async function getCashFlowStatements(symbol: string): Promise<FMPCashFlow
 export async function getBalanceSheets(symbol: string): Promise<FMPBalanceSheet[]> {
   try {
     return await fetchJson<FMPBalanceSheet[]>(
-      `${BASE_URL}/balance-sheet-statement?symbol=${symbol}&period=annual&limit=5`, true
+      `${BASE_URL}/balance-sheet-statement?symbol=${symbol}&period=quarter&limit=20`, true
     );
   } catch {
     return [];

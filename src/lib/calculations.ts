@@ -15,6 +15,74 @@ export interface FinancialYear {
   shares_outstanding: number | null;
 }
 
+export interface QuarterlyFinancial extends FinancialYear {
+  fiscal_quarter: number;
+}
+
+function sumField(rows: QuarterlyFinancial[], field: keyof QuarterlyFinancial): number | null {
+  const vals = rows.map((r) => r[field] as number | null).filter((v): v is number => v != null);
+  return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) : null;
+}
+
+export function buildTTM(quarters: QuarterlyFinancial[]): FinancialYear | null {
+  const sorted = [...quarters].sort((a, b) =>
+    b.fiscal_year !== a.fiscal_year ? b.fiscal_year - a.fiscal_year : b.fiscal_quarter - a.fiscal_quarter
+  );
+  const last4 = sorted.slice(0, 4);
+  if (last4.length < 4) return null;
+
+  const latest = last4[0];
+  return {
+    fiscal_year: latest.fiscal_year,
+    revenue: sumField(last4, "revenue"),
+    net_income: sumField(last4, "net_income"),
+    eps_diluted: sumField(last4, "eps_diluted"),
+    operating_cash_flow: sumField(last4, "operating_cash_flow"),
+    capital_expenditure: sumField(last4, "capital_expenditure"),
+    free_cash_flow: sumField(last4, "free_cash_flow"),
+    dividends_paid: sumField(last4, "dividends_paid"),
+    total_equity: latest.total_equity,
+    total_debt: latest.total_debt,
+    total_assets: latest.total_assets,
+    total_current_assets: latest.total_current_assets,
+    total_current_liabilities: latest.total_current_liabilities,
+    shares_outstanding: latest.shares_outstanding,
+  };
+}
+
+export function buildAnnualSeries(quarters: QuarterlyFinancial[]): FinancialYear[] {
+  const byYear = new Map<number, QuarterlyFinancial[]>();
+  for (const q of quarters) {
+    const arr = byYear.get(q.fiscal_year) || [];
+    arr.push(q);
+    byYear.set(q.fiscal_year, arr);
+  }
+
+  const annuals: FinancialYear[] = [];
+  for (const [year, qs] of byYear) {
+    if (qs.length < 4) continue;
+    const latest = [...qs].sort((a, b) => b.fiscal_quarter - a.fiscal_quarter)[0];
+    annuals.push({
+      fiscal_year: year,
+      revenue: sumField(qs, "revenue"),
+      net_income: sumField(qs, "net_income"),
+      eps_diluted: sumField(qs, "eps_diluted"),
+      operating_cash_flow: sumField(qs, "operating_cash_flow"),
+      capital_expenditure: sumField(qs, "capital_expenditure"),
+      free_cash_flow: sumField(qs, "free_cash_flow"),
+      dividends_paid: sumField(qs, "dividends_paid"),
+      total_equity: latest.total_equity,
+      total_debt: latest.total_debt,
+      total_assets: latest.total_assets,
+      total_current_assets: latest.total_current_assets,
+      total_current_liabilities: latest.total_current_liabilities,
+      shares_outstanding: latest.shares_outstanding,
+    });
+  }
+
+  return annuals.sort((a, b) => b.fiscal_year - a.fiscal_year);
+}
+
 export function calculateDCF(
   financials: FinancialYear[],
   beta: number | null,

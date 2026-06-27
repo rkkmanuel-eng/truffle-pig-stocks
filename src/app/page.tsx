@@ -3,6 +3,7 @@ import { screenStocks } from "@/lib/screener";
 import { evaluateAll } from "@/lib/valuations";
 import { getDividendTiers } from "@/lib/dividends";
 import { getMetadata } from "@/lib/db";
+import { DEFAULT_MIN_MARKET_CAP } from "@/lib/config";
 
 import StrategyColumn from "@/components/StrategyColumn";
 import ValuationColumn from "@/components/ValuationColumn";
@@ -25,7 +26,7 @@ export default async function Home({
 }) {
   const { buffer: bufferParam, minCap: minCapParam } = await searchParams;
   const buffer = Math.min(20, Math.max(0, Number(bufferParam) || 0));
-  const minCap = Math.max(0, Number(minCapParam) || 0);
+  const minCap = minCapParam !== undefined ? Math.max(0, Number(minCapParam) || 0) : DEFAULT_MIN_MARKET_CAP;
   const lastRefresh = getMetadata("last_refresh_at");
 
   const strategyColumns = STRATEGIES.map((strategy) => ({

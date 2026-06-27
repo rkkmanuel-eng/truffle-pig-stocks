@@ -115,6 +115,7 @@ function migrate(db: Database.Database) {
     CREATE TABLE IF NOT EXISTS financials (
       symbol TEXT NOT NULL,
       fiscal_year INTEGER NOT NULL,
+      fiscal_quarter INTEGER NOT NULL,
       revenue REAL,
       net_income REAL,
       eps_diluted REAL,
@@ -129,9 +130,23 @@ function migrate(db: Database.Database) {
       dividends_paid REAL,
       shares_outstanding REAL,
       fetched_at TEXT DEFAULT (datetime('now')),
-      PRIMARY KEY (symbol, fiscal_year)
+      PRIMARY KEY (symbol, fiscal_year, fiscal_quarter)
     );
   `);
+
+  // Migrate old financials table (no fiscal_quarter) to new schema
+  const finCols = db.prepare("PRAGMA table_info(financials)").all() as { name: string }[];
+  if (finCols.length > 0 && !finCols.some((c) => c.name === "fiscal_quarter")) {
+    db.exec("DROP TABLE financials");
+    db.exec(`CREATE TABLE financials (
+      symbol TEXT NOT NULL, fiscal_year INTEGER NOT NULL, fiscal_quarter INTEGER NOT NULL,
+      revenue REAL, net_income REAL, eps_diluted REAL, total_equity REAL, total_debt REAL,
+      total_assets REAL, total_current_assets REAL, total_current_liabilities REAL,
+      operating_cash_flow REAL, capital_expenditure REAL, free_cash_flow REAL,
+      dividends_paid REAL, shares_outstanding REAL, fetched_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (symbol, fiscal_year, fiscal_quarter)
+    )`);
+  }
 
   addColumnIfMissing(db, "users", "email_verified", "INTEGER DEFAULT 0");
   addColumnIfMissing(db, "users", "verification_token", "TEXT");
@@ -472,6 +487,7 @@ export function setMetadata(key: string, value: string) {
 export interface FinancialRow {
   symbol: string;
   fiscal_year: number;
+  fiscal_quarter: number;
   revenue: number | null;
   net_income: number | null;
   eps_diluted: number | null;
@@ -490,7 +506,7 @@ export interface FinancialRow {
 
 export function getFinancials(symbol: string): FinancialRow[] {
   return getDb()
-    .prepare("SELECT * FROM financials WHERE symbol = ? ORDER BY fiscal_year DESC")
+    .prepare("SELECT * FROM financials WHERE symbol = ? ORDER BY fiscal_year DESC, fiscal_quarter DESC")
     .all(symbol) as FinancialRow[];
 }
 
@@ -504,11 +520,11 @@ export function hasFinancials(symbol: string): boolean {
 export function upsertFinancial(f: Omit<FinancialRow, "fetched_at">) {
   getDb()
     .prepare(
-      `INSERT INTO financials (symbol, fiscal_year, revenue, net_income, eps_diluted,
+      `INSERT INTO financials (symbol, fiscal_year, fiscal_quarter, revenue, net_income, eps_diluted,
          total_equity, total_debt, total_assets, total_current_assets, total_current_liabilities,
          operating_cash_flow, capital_expenditure, free_cash_flow, dividends_paid, shares_outstanding)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(symbol, fiscal_year) DO UPDATE SET
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(symbol, fiscal_year, fiscal_quarter) DO UPDATE SET
          revenue=excluded.revenue, net_income=excluded.net_income, eps_diluted=excluded.eps_diluted,
          total_equity=excluded.total_equity, total_debt=excluded.total_debt, total_assets=excluded.total_assets,
          total_current_assets=excluded.total_current_assets, total_current_liabilities=excluded.total_current_liabilities,
@@ -517,7 +533,7 @@ export function upsertFinancial(f: Omit<FinancialRow, "fetched_at">) {
          shares_outstanding=excluded.shares_outstanding, fetched_at=datetime('now')`
     )
     .run(
-      f.symbol, f.fiscal_year, f.revenue, f.net_income, f.eps_diluted,
+      f.symbol, f.fiscal_year, f.fiscal_quarter, f.revenue, f.net_income, f.eps_diluted,
       f.total_equity, f.total_debt, f.total_assets, f.total_current_assets, f.total_current_liabilities,
       f.operating_cash_flow, f.capital_expenditure, f.free_cash_flow, f.dividends_paid, f.shares_outstanding
     );

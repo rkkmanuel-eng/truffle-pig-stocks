@@ -102,6 +102,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS financials (
     symbol TEXT NOT NULL,
     fiscal_year INTEGER NOT NULL,
+    fiscal_quarter INTEGER NOT NULL,
     revenue REAL,
     net_income REAL,
     eps_diluted REAL,
@@ -116,7 +117,7 @@ db.exec(`
     dividends_paid REAL,
     shares_outstanding REAL,
     fetched_at TEXT DEFAULT (datetime('now')),
-    PRIMARY KEY (symbol, fiscal_year)
+    PRIMARY KEY (symbol, fiscal_year, fiscal_quarter)
   );
 `);
 
