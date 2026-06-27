@@ -9,34 +9,16 @@ import {
   SP500_SAMPLE,
 } from "@/lib/fmp";
 
-export const maxDuration = 900;
-
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization");
-    const querySecret = req.nextUrl.searchParams.get("secret");
-    const authorized =
-      authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
-    if (!authorized) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
-
-  if (!process.env.FMP_API_KEY) {
-    return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
-  }
-
+async function refreshStocks() {
   const dbSymbols = getAllStockSymbols();
   const symbols = dbSymbols.length > 0 ? dbSymbols : SP500_SAMPLE;
   const startTime = Date.now();
-  const results: string[] = [];
-  const errors: string[] = [];
+  let updated = 0;
+  let failed = 0;
 
   for (let i = 0; i < symbols.length; i++) {
     const symbol = symbols[i];
@@ -49,7 +31,7 @@ export async function GET(req: NextRequest) {
       ]);
 
       if (!quote) {
-        errors.push(symbol);
+        failed++;
         continue;
       }
 
@@ -84,9 +66,9 @@ export async function GET(req: NextRequest) {
         created_at: null,
       });
 
-      results.push(symbol);
+      updated++;
     } catch (err) {
-      errors.push(symbol);
+      failed++;
       console.error(`[cron] Failed: ${symbol}`, err);
     }
 
@@ -96,20 +78,37 @@ export async function GET(req: NextRequest) {
 
     const elapsed = (Date.now() - startTime) / 1000;
     if (elapsed > 840) {
-      console.log(`[cron/refresh] Time limit approaching at ${i + 1}/${symbols.length}`);
+      console.log(`[cron/refresh] Time limit at ${i + 1}/${symbols.length}, updated ${updated}`);
       break;
     }
   }
 
   const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[cron/refresh] Done: updated ${updated}, failed ${failed}, total ${getStockCount()}, ${duration}s`);
+}
+
+export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (cronSecret) {
+    const authHeader = req.headers.get("authorization");
+    const querySecret = req.nextUrl.searchParams.get("secret");
+    const authorized =
+      authHeader === `Bearer ${cronSecret}` || querySecret === cronSecret;
+    if (!authorized) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  if (!process.env.FMP_API_KEY) {
+    return NextResponse.json({ error: "FMP_API_KEY not set" }, { status: 500 });
+  }
+
+  refreshStocks().catch((err) => console.error("[cron/refresh] Fatal:", err));
 
   return NextResponse.json({
     ok: true,
-    updated: results.length,
-    failed: errors.length,
-    total: getStockCount(),
-    totalTracked: symbols.length,
-    durationSeconds: duration,
-    errors: errors.length > 0 ? errors : undefined,
+    message: "Refresh started in background",
+    totalTracked: getAllStockSymbols().length,
   });
 }
