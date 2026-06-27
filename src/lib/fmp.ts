@@ -167,15 +167,10 @@ export const DOW_SYMBOLS = [
   "MSFT", "NKE", "PG", "SHW", "TRV", "UNH", "V", "VZ", "WBA", "WMT",
 ];
 
-export const SP500_SAMPLE = [
-  ...DOW_SYMBOLS,
-  "GOOGL", "AMZN", "META", "TSLA", "NVDA", "BRK-B", "LLY", "AVGO", "XOM",
-  "PEP", "COST", "ADBE", "NFLX", "AMD", "QCOM", "INTC", "CMCSA", "TXN",
-  "PM", "ABT", "DHR", "NEE", "LIN", "BMY", "ORCL", "ACN", "MDT", "COP",
-  "LOW", "T", "SCHW", "MS", "BLK", "GILD", "AMAT", "ADP", "PFE", "C",
-  "USB", "SO", "DUK", "EMR", "CL", "APD", "ITW", "MMC", "GD", "FDX",
-];
+import { STOCK_UNIVERSE } from "./stock-universe";
+
+export const SP500_SAMPLE = STOCK_UNIVERSE;
 
 export async function getAllTrackedSymbols(): Promise<string[]> {
-  return SP500_SAMPLE;
+  return STOCK_UNIVERSE;
 }

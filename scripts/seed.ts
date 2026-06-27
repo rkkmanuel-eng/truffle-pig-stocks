@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
+import { STOCK_UNIVERSE } from "../src/lib/stock-universe";
 
 const DB_DIR = process.env.DB_DIR || process.cwd();
 const db = new Database(path.join(DB_DIR, "data.db"));
@@ -121,55 +122,7 @@ const DOW_SYMBOLS = [
   "MSFT", "NKE", "PG", "SHW", "TRV", "UNH", "V", "VZ", "WBA", "WMT",
 ];
 
-const STOCK_SYMBOLS = [
-  ...DOW_SYMBOLS,
-  "GOOGL", "AMZN", "META", "TSLA", "NVDA", "AVGO", "XOM",
-  "PEP", "COST", "ADBE", "NFLX", "AMD", "QCOM", "INTC", "CMCSA", "TXN",
-  "PM", "ABT", "DHR", "NEE", "LIN", "BMY", "ORCL", "ACN", "MDT", "COP",
-  "LOW", "T", "SCHW", "MS", "BLK", "GILD", "AMAT", "ADP", "PFE", "C",
-  "USB", "SO", "DUK", "EMR", "CL", "APD", "ITW", "MMC", "GD", "FDX",
-  "LLY", "BRK.B", "TMO", "ISRG", "INTU", "SPGI", "SYK", "BKNG", "VRTX",
-  "REGN", "BSX", "LRCX", "KLAC", "SNPS", "CDNS", "PANW", "CRWD", "MRVL",
-  "ABNB", "FTNT", "DXCM", "MNST", "IDXX", "ODFL", "CTAS", "CPRT", "EW",
-  "PYPL", "MELI", "ORLY", "AZO", "ROP", "MSCI", "KEYS", "TDG", "WST",
-  "CME", "ICE", "MCO", "NDAQ", "CBOE", "CMG", "YUM", "SBUX", "DPZ",
-  "WM", "RSG", "ECL", "STE", "POOL", "FAST", "ROK", "AME", "TRGP",
-  "PSA", "AMT", "CCI", "EQIX", "O", "PLD", "SPG", "DLR", "WELL",
-  "DE", "ETN", "PH", "IR", "GWW", "SWK", "NDSN",
-  "ZTS", "DDOG", "SNOW", "NET", "WDAY", "TEAM", "MDB", "TTD",
-  "NOW", "UBER", "COIN", "PLTR", "DASH", "SPOT",
-  "WFC", "BAC", "GS", "AIG", "MET", "PRU", "ALL", "AFL", "PGR", "CB",
-  "CI", "ELV", "HCA", "HUM", "CNC", "MOH",
-  "RTX", "LMT", "NOC", "GE", "LHX", "HII", "TDY",
-  "F", "GM", "TM", "RIVN",
-  "AAL", "DAL", "UAL", "LUV", "ALK",
-  "CVS", "WBA", "MCK", "ABC", "CAH",
-  "UPS", "FDX", "CHRW", "XPO", "JBHT", "EXPD",
-  "CARR", "JCI", "TT", "GNRC",
-  "D", "AEP", "XEL", "ES", "WEC", "ED", "EXC", "PCG", "SRE", "AES",
-  "OXY", "EOG", "SLB", "PSX", "VLO", "MPC", "HAL", "DVN", "FANG", "HES",
-  "KMB", "CHD", "MO", "STZ", "BF.B", "TAP", "SAM",
-  "TGT", "DLTR", "DG", "ROST", "TJX", "BURL",
-  "LULU", "DECK", "ON", "SWKS", "MCHP", "MPWR",
-  "FICO", "FIS", "GPN", "WEX", "JKHY",
-  "A", "TMO", "DHR", "WAT", "PKI", "MTD", "BIO",
-  "IT", "EPAM", "LDOS", "BAH", "ACN",
-  "TMUS", "VZ", "T", "CHTR",
-  "MA", "AXP",
-  "HPQ", "DELL", "HPE", "NTAP",
-  "CRM", "SAP", "HUBS", "VEEV", "DOCU", "ZS", "OKTA",
-  "ANET", "CSCO", "JNPR", "MSI",
-  "PXD", "CTRA", "EQT", "AR", "RRC",
-  "NEM", "FCX", "SCCO", "CLF", "NUE", "STLD",
-  "ALB", "LYB", "DOW", "CE", "EMN",
-  "AVB", "EQR", "MAA", "UDR", "CPT", "ESS",
-  "BXP", "VTR", "HST", "KIM", "REG", "FRT",
-  "NXPI", "TER", "ENTG", "MKSI",
-  "AOS", "SJM", "K", "GIS", "HRL", "CAG", "CPB",
-  "HSY", "MDLZ", "MNST",
-];
-
-const uniqueSymbols = [...new Set(STOCK_SYMBOLS)];
+const uniqueSymbols = [...new Set([...DOW_SYMBOLS, ...STOCK_UNIVERSE])];
 
 const insertStock = db.prepare(`
   INSERT OR IGNORE INTO stocks (symbol, name, is_dow)
